@@ -7,9 +7,10 @@ import { DataGridWebSocket } from './DataGridWebSocket'
 // Mock the compact codec to allow intercepting decode() in specific tests
 const mockDecode = vi.fn()
 vi.mock('json-joy/lib/json-crdt-patch/codec/compact', async importOriginal => {
-  const actual = await importOriginal<
-    typeof import('json-joy/lib/json-crdt-patch/codec/compact')
-  >()
+  const actual =
+    await importOriginal<
+      typeof import('json-joy/lib/json-crdt-patch/codec/compact')
+    >()
   return {
     ...actual,
     decode: (...args: unknown[]) => mockDecode(...args) as unknown,
@@ -413,6 +414,80 @@ describe('DataGridWebSocket', () => {
 
       expect(onGridReady).toHaveBeenCalledTimes(1)
     })
+
+    it('calls onSyncEnd when clocks are synchronized', () => {
+      const onSyncEnd = vi.fn()
+      vi.spyOn(console, 'debug').mockImplementation(() => {})
+      vi.spyOn(console, 'log').mockImplementation(() => {})
+      const { mockSocket } = createDataGridWebSocket({ onSyncEnd })
+
+      mockSocket.simulateMessage([5, 1])
+
+      expect(onSyncEnd).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('sync lifecycle callbacks', () => {
+    it('calls onSyncStart when sending synchronize-clock on "connected" notification', () => {
+      const onSyncStart = vi.fn()
+      vi.spyOn(console, 'debug').mockImplementation(() => {})
+      vi.spyOn(console, 'log').mockImplementation(() => {})
+      const { mockSocket } = createDataGridWebSocket({
+        onSyncStart,
+        model: createTestModel(),
+      })
+
+      mockSocket.simulateMessage([8, 'connected'])
+
+      expect(onSyncStart).toHaveBeenCalledTimes(1)
+    })
+
+    it('calls onSyncStart when sending synchronize-clock on "new-patch" notification', () => {
+      const onSyncStart = vi.fn()
+      vi.spyOn(console, 'debug').mockImplementation(() => {})
+      vi.spyOn(console, 'log').mockImplementation(() => {})
+      const { mockSocket } = createDataGridWebSocket({
+        onSyncStart,
+        model: createTestModel(),
+      })
+
+      mockSocket.simulateMessage([8, 'new-patch'])
+
+      expect(onSyncStart).toHaveBeenCalledTimes(1)
+    })
+
+    it('calls onSyncStart after applying a server patch and flushing pending ops', () => {
+      const onSyncStart = vi.fn()
+      vi.spyOn(console, 'debug').mockImplementation(() => {})
+      vi.spyOn(console, 'log').mockImplementation(() => {})
+      const { mockSocket } = createDataGridWebSocket({
+        onSyncStart,
+        model: null,
+      })
+
+      const sourceModel = createTestModel()
+      const patchMessage = buildPatchResponseMessage(sourceModel)
+      mockSocket.simulateMessage(patchMessage)
+
+      // After applying the server patch, the client has no pending ops, so
+      // sendClockSync should fall through to sendSyncMessage and trigger onSyncStart
+      expect(onSyncStart).toHaveBeenCalled()
+    })
+
+    it('does not call onSyncStart on "new-patch" when model is null', () => {
+      const onSyncStart = vi.fn()
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      vi.spyOn(console, 'debug').mockImplementation(() => {})
+      vi.spyOn(console, 'log').mockImplementation(() => {})
+      const { mockSocket } = createDataGridWebSocket({
+        onSyncStart,
+        model: null,
+      })
+
+      mockSocket.simulateMessage([8, 'new-patch'])
+
+      expect(onSyncStart).not.toHaveBeenCalled()
+    })
   })
 
   describe('messageHandler — notifications', () => {
@@ -476,6 +551,26 @@ describe('DataGridWebSocket', () => {
       expect(mockSocket.sentMessages.length).toBe(0)
     })
 
+    it('calls onReplicaConnected on "replica-connected" notification', () => {
+      vi.spyOn(console, 'debug').mockImplementation(() => {})
+      const onReplicaConnected = vi.fn()
+      const { mockSocket } = createDataGridWebSocket({ onReplicaConnected })
+
+      mockSocket.simulateMessage([8, 'replica-connected'])
+
+      expect(onReplicaConnected).toHaveBeenCalledTimes(1)
+    })
+
+    it('calls onReplicaDisconnected on "replica-disconnected" notification', () => {
+      vi.spyOn(console, 'debug').mockImplementation(() => {})
+      const onReplicaDisconnected = vi.fn()
+      const { mockSocket } = createDataGridWebSocket({ onReplicaDisconnected })
+
+      mockSocket.simulateMessage([8, 'replica-disconnected'])
+
+      expect(onReplicaDisconnected).toHaveBeenCalledTimes(1)
+    })
+
     it('accepts "ping" notification', () => {
       vi.spyOn(console, 'debug').mockImplementation(() => {})
       vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -496,6 +591,33 @@ describe('DataGridWebSocket', () => {
         'Error from server:',
         'something went wrong',
       )
+    })
+
+    it('calls onError with the payload on "error" notification', () => {
+      const onError = vi.fn()
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      vi.spyOn(console, 'debug').mockImplementation(() => {})
+      vi.spyOn(console, 'log').mockImplementation(() => {})
+      const { mockSocket } = createDataGridWebSocket({ onError })
+
+      mockSocket.simulateMessage([8, 'error', 'something went wrong'])
+
+      expect(onError).toHaveBeenCalledTimes(1)
+      expect(onError).toHaveBeenCalledWith('something went wrong')
+    })
+
+    it('calls onError with an object payload on "error" notification', () => {
+      const onError = vi.fn()
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      vi.spyOn(console, 'debug').mockImplementation(() => {})
+      vi.spyOn(console, 'log').mockImplementation(() => {})
+      const { mockSocket } = createDataGridWebSocket({ onError })
+
+      const errorPayload = { code: 500, message: 'Internal error' }
+      mockSocket.simulateMessage([8, 'error', errorPayload])
+
+      expect(onError).toHaveBeenCalledTimes(1)
+      expect(onError).toHaveBeenCalledWith(errorPayload)
     })
   })
 

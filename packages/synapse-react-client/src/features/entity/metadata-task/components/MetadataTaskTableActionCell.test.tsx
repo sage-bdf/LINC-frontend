@@ -1,122 +1,92 @@
-import MetadataTaskTableActionCell from './MetadataTaskTableActionCell'
-import { render, screen, waitFor } from '@testing-library/react'
+import { createMockTaskBundle } from '@/mocks/curation/mockCurationTask'
+import { TaskBundle } from '@sage-bionetworks/synapse-client'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { getLinkToGridSession } from '@/utils/functions/getSynapseWebClientLink'
-import useGridSessionForCurationTask from '../hooks/useGridSessionForCurationTask'
-import { useQuery } from '@tanstack/react-query'
-import type {
-  CurationTask,
-  GridSession,
-  SynapseClientError,
-} from '@sage-bionetworks/synapse-client'
-import type { UserEntityPermissions } from '@sage-bionetworks/synapse-types'
-import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query'
-import { displayToast } from '@/components/ToastMessage/ToastMessage'
+import { useNavigate } from 'react-router'
+import { beforeEach } from 'vitest'
+import MetadataTaskTableActionCell from './MetadataTaskTableActionCell'
+import useOpenCuratorFromTaskButton from '../hooks/useOpenCuratorButton'
 
-vi.mock('../hooks/useGridSessionForCurationTask', () => ({
+vi.mock('react-router')
+
+vi.mock('../hooks/useOpenCuratorButton', () => ({
   default: vi.fn(),
 }))
 
-vi.mock('@/utils/functions/getSynapseWebClientLink', () => ({
-  getLinkToGridSession: vi.fn(),
-}))
+const mockUseOpenCuratorFromTaskButton = vi.mocked(useOpenCuratorFromTaskButton)
 
-vi.mock('@tanstack/react-query', async () => {
-  const actual = await vi.importActual<typeof import('@tanstack/react-query')>(
-    '@tanstack/react-query',
-  )
-  return {
-    ...actual,
-    useQuery: vi.fn(),
-  }
-})
+const mockOnClick = vi.fn()
+const mockNavigate = vi.fn()
 
-vi.mock('@/components/ToastMessage/ToastMessage')
+const mockTaskBundle = createMockTaskBundle()
 
-const mockDisplayToast = vi.mocked(displayToast)
-const mockUseGridSessionForCurationTask = vi.mocked(
-  useGridSessionForCurationTask,
-)
-const mockGetLinkToGridSession = vi.mocked(getLinkToGridSession)
-const mockUseQuery = vi.mocked(useQuery)
-type MutationResult = UseMutationResult<
-  GridSession,
-  SynapseClientError,
-  { curationTask: CurationTask }
->
-type EntityPermissionsQueryResult = UseQueryResult<UserEntityPermissions | null>
-
-const mockMutateAsync = vi.fn<MutationResult['mutateAsync']>()
-
-const createMutationResult = (
-  overrides: Partial<MutationResult> = {},
-): MutationResult =>
-  ({
-    mutateAsync: mockMutateAsync,
-    isPending: false,
-    ...overrides,
-  } as Partial<MutationResult> as MutationResult)
-
-const createQueryResult = (
-  overrides: Partial<EntityPermissionsQueryResult> = {},
-): EntityPermissionsQueryResult =>
-  ({
-    data: { canView: true } as UserEntityPermissions,
-    fetchStatus: 'idle',
-    status: 'success',
-    ...overrides,
-  } as Partial<EntityPermissionsQueryResult> as EntityPermissionsQueryResult)
-
-const mockCurationTask = {
-  taskId: 123,
-  taskProperties: {
-    concreteType:
-      'org.sagebionetworks.repo.model.curation.metadata.FileBasedMetadataTaskProperties',
-    fileViewId: 'syn999',
-  },
-} as unknown as CurationTask
-
-const renderComponent = () =>
+const renderComponent = (
+  overrides: Partial<{ taskBundle: TaskBundle; canEdit: boolean }> = {},
+) =>
   render(
     <MetadataTaskTableActionCell
-      curationTask={mockCurationTask}
-      canEdit={false}
+      taskBundle={overrides.taskBundle ?? mockTaskBundle}
+      canEdit={overrides.canEdit ?? false}
     />,
   )
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockMutateAsync.mockResolvedValue({ sessionId: 'session-123' })
-  mockUseGridSessionForCurationTask.mockReturnValue(createMutationResult())
-  mockUseQuery.mockReturnValue(createQueryResult())
-  mockGetLinkToGridSession.mockReturnValue('mock-grid-url')
+  vi.mocked(useNavigate).mockReturnValue(mockNavigate)
+  mockUseOpenCuratorFromTaskButton.mockReturnValue({
+    hasPermission: true,
+    isLoading: false,
+    isPending: false,
+    onClick: mockOnClick,
+  })
 })
 
 describe('MetadataTaskTableActionCell', () => {
-  it('disables the Open Curator button while checking READ access', () => {
-    mockUseQuery.mockReturnValue(
-      createQueryResult({
-        data: undefined,
-        fetchStatus: 'fetching',
-        status: 'pending',
-        isPending: true,
-        isFetching: true,
-      }),
+  it('does not render the Edit button when the user cannot edit', () => {
+    renderComponent({ canEdit: false })
+
+    expect(
+      screen.queryByRole('button', { name: /^edit$/i }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('renders the Edit button when the user can edit', () => {
+    renderComponent({ canEdit: true })
+
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument()
+  })
+
+  it('navigates to the edit route for the task when Edit is clicked', async () => {
+    const user = userEvent.setup()
+    renderComponent({ canEdit: true })
+
+    await user.click(screen.getByRole('button', { name: /^edit$/i }))
+
+    expect(mockNavigate).toHaveBeenCalledWith(
+      `edit/${mockTaskBundle.task!.taskId}`,
     )
+  })
+
+  it('disables the Open Curator button while checking READ access', () => {
+    mockUseOpenCuratorFromTaskButton.mockReturnValue({
+      hasPermission: undefined,
+      isLoading: true,
+      isPending: false,
+      onClick: mockOnClick,
+    })
 
     renderComponent()
 
     expect(screen.getByRole('button', { name: /open curator/i })).toBeDisabled()
   })
 
-  it('disables the Open Curator button when READ access is denied', () => {
-    mockUseQuery.mockReturnValue(
-      createQueryResult({
-        data: { canView: false } as UserEntityPermissions,
-        fetchStatus: 'idle',
-        status: 'success',
-      }),
-    )
+  it('disables the Open Curator button with no READ access on source entity', () => {
+    mockUseOpenCuratorFromTaskButton.mockReturnValue({
+      hasPermission: false,
+      isLoading: false,
+      isPending: false,
+      onClick: mockOnClick,
+    })
 
     renderComponent()
 
@@ -124,99 +94,15 @@ describe('MetadataTaskTableActionCell', () => {
   })
 
   it('disables the Open Curator button while opening the grid session', () => {
-    mockUseQuery.mockReturnValue(
-      createQueryResult({
-        data: { canView: true } as UserEntityPermissions,
-        fetchStatus: 'idle',
-        status: 'success',
-      }),
-    )
-    mockUseGridSessionForCurationTask.mockReturnValue(
-      createMutationResult({
-        isPending: true,
-      }),
-    )
+    mockUseOpenCuratorFromTaskButton.mockReturnValue({
+      hasPermission: true,
+      isLoading: false,
+      isPending: true,
+      onClick: mockOnClick,
+    })
 
     renderComponent()
 
     expect(screen.getByRole('button', { name: /open curator/i })).toBeDisabled()
-  })
-
-  it('requests a grid session and opens it in a new tab when clicked', async () => {
-    mockUseQuery.mockReturnValue(
-      createQueryResult({
-        data: { canView: true } as UserEntityPermissions,
-        fetchStatus: 'idle',
-        status: 'success',
-      }),
-    )
-    mockMutateAsync.mockResolvedValue({ sessionId: 'session-123' })
-    mockGetLinkToGridSession.mockReturnValue('https://example.org/grid')
-
-    const windowOpenSpy = vi
-      .spyOn(window, 'open')
-      .mockReturnValue(null as unknown as Window)
-
-    renderComponent()
-
-    const button = screen.getByRole('button', { name: /open curator/i })
-    expect(button).toBeEnabled()
-
-    const user = userEvent.setup()
-    await user.click(button)
-
-    await waitFor(() => {
-      expect(mockMutateAsync).toHaveBeenCalledWith({
-        curationTask: mockCurationTask,
-      })
-      expect(mockGetLinkToGridSession).toHaveBeenCalledWith(
-        'session-123',
-        mockCurationTask.taskId,
-      )
-      expect(windowOpenSpy).toHaveBeenCalledWith(
-        'https://example.org/grid',
-        '_blank',
-        'noopener',
-      )
-    })
-
-    windowOpenSpy.mockRestore()
-  })
-
-  it('displays an error toast if opening the data grid fails', async () => {
-    const consoleErrorSpy = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {})
-
-    mockUseQuery.mockReturnValue(
-      createQueryResult({
-        data: { canView: true } as UserEntityPermissions,
-        fetchStatus: 'idle',
-        status: 'success',
-      }),
-    )
-    const errorMessage = 'Failed to open grid session'
-    mockMutateAsync.mockRejectedValue(new Error(errorMessage))
-
-    renderComponent()
-
-    const button = screen.getByRole('button', { name: /open curator/i })
-    await userEvent.click(button)
-
-    await waitFor(() => {
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Error opening Curator for curation task',
-        expect.any(Error),
-      )
-      expect(mockDisplayToast).toHaveBeenCalledWith(
-        errorMessage,
-        'danger',
-        expect.objectContaining({
-          title: 'An error occurred while trying to open Curator',
-        }),
-      )
-    })
-
-    consoleErrorSpy.mockRestore()
   })
 })

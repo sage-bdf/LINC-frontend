@@ -38,32 +38,30 @@ import TableRowGenericCard, {
   TableToGenericCardMapping,
 } from './TableRowGenericCard'
 
-vi.mock('@/components/GenericCard/PortalDOI/PortalDOI', () => ({
-  __esModule: true,
-  default: vi.fn().mockReturnValue(<div data-testid="PortalDOI" />),
-}))
+vi.mock('@/components/GenericCard/PortalDOI/PortalDOI')
 vi.mock('@/components/GenericCard/PortalDOI/PortalDOIUtils')
-vi.mock('@/components/GenericCard/CroissantButton/CroissantButton', () => ({
-  __esModule: true,
-  default: vi.fn().mockReturnValue(<div data-testid="CroissantButton" />),
-}))
-vi.mock('../widgets/FileHandleLink', () => ({
-  FileHandleLink: vi.fn().mockReturnValue(<div data-testid="FileHandleLink" />),
-}))
-vi.mock('../widgets/ImageFileHandle', () => ({
-  ImageFileHandle: vi
-    .fn()
-    .mockReturnValue(<img data-testid="ImageFileHandle" />),
-}))
-vi.mock('../EntityDownloadConfirmation', () => ({
-  EntityDownloadConfirmation: vi
-    .fn()
-    .mockReturnValue(<div data-testid="EntityDownloadConfirmation" />),
-}))
+vi.mock('@/components/GenericCard/CroissantButton/CroissantButton')
+vi.mock('../widgets/FileHandleLink')
+vi.mock('../widgets/ImageFileHandle')
+vi.mock('../EntityDownloadConfirmation')
 vi.mock('@/components/IconSvg/IconSvg', async importOriginal => ({
   ...(await importOriginal<typeof IconSvgModule>()),
-  default: vi.fn().mockReturnValue(<img data-testid="IconSvg" />),
+  default: vi.fn(),
 }))
+
+// Set default mock return values (must be after imports so JSX is available)
+vi.mocked(PortalDOI).mockReturnValue(<div data-testid="PortalDOI" />)
+vi.mocked(CroissantButton).mockReturnValue(
+  <div data-testid="CroissantButton" />,
+)
+vi.mocked(FileHandleLink).mockReturnValue(<div data-testid="FileHandleLink" />)
+vi.mocked(ImageFileHandle).mockReturnValue(
+  <img data-testid="ImageFileHandle" />,
+)
+vi.mocked(EntityDownloadConfirmation).mockReturnValue(
+  <div data-testid="EntityDownloadConfirmation" />,
+)
+vi.mocked(IconSvg).mockReturnValue(<img data-testid="IconSvg" />)
 
 const renderComponent = (
   props: TableRowGenericCardProps,
@@ -120,6 +118,7 @@ const genericCardSchema: TableToGenericCardMapping = {
 }
 const genericCardSchemaHeader: TableToGenericCardMapping = {
   ...commonProps,
+  secondaryLabels: [labelOneColumnName],
 }
 const schema = {
   title: 0,
@@ -142,7 +141,7 @@ const MOCKED_SUBTITLE = 'MOCKED SUBTITLE'
 const MOCKED_DESCRIPTION = 'MOCKED DESCRIPTION'
 const MOCKED_ICON = 'dataset'
 const MOCKED_LABELONE = 'MOCKED_LABELONE'
-const MOCKED_LABELTWO = 'MOCKED_LABELONE'
+const MOCKED_LABELTWO = 'MOCKED_LABELTWO'
 const MOCKED_LINK = 'MOCKED_LINK'
 const MOCKED_ID = 'MOCKED_ID'
 const MOCKED_IMAGE_FILE_HANDLE_ID = 'MOCKED_IMAGE_FILE_HANDLE_ID'
@@ -229,6 +228,25 @@ describe('TableRowGenericCard tests', () => {
     ).not.toBeInTheDocument()
     within(container.querySelector('.SRC-font-size-base')!).getByText(data[2])
     screen.getByTestId('CardFooter')
+  })
+
+  test('labels the DUO row with the column display name so it matches the facet', async () => {
+    // The card row for DUO tags must be labeled with the dataUseModifiers column's
+    // display name (unCamelCase / any alias) — the same source the facet uses —
+    // rather than a hardcoded string, so the two never diverge.
+    renderComponent(
+      {
+        ...propsForNonHeaderMode,
+        schema: { ...schema, dataUseModifiers: 13 },
+        data: [...data, 'DUO:0000046'],
+        genericCardSchema: {
+          ...genericCardSchema,
+          dataUseModifiersColumnName: 'dataUseModifiers',
+        },
+      },
+      'TableEntity',
+    )
+    expect(await screen.findByText('Data Use Modifiers')).toBeInTheDocument()
   })
 
   describe('Renders UserCards when a UserId_List column is present', () => {
@@ -473,6 +491,101 @@ describe('TableRowGenericCard tests', () => {
         {},
       )
       expect(howToDownloadLabel).toBeVisible()
+    })
+  })
+
+  describe('hostingConfig', () => {
+    const hostingSchema = {
+      ...schema,
+      downloadType: 13,
+    }
+    const hostingData = [...data.slice(0, 12), 'syn9999.2', 'Synapse Hosted']
+
+    const propsWithHosting = (
+      hostingValue: string,
+      overrides: Partial<TableToGenericCardMapping> = {},
+    ): TableRowGenericCardProps => {
+      const rowData = [...hostingData]
+      rowData[13] = hostingValue
+      return {
+        ...propsForNonHeaderMode,
+        data: rowData,
+        schema: hostingSchema,
+        genericCardSchema: {
+          ...genericCardSchema,
+          downloadCartSynId: 'datasetAlias',
+          hostingConfig: {
+            hostingColumn: 'downloadType',
+            hostingValueMap: {
+              'Synapse Hosted': 'synapse',
+              'Synapse Indexed': 'external-download',
+              'Externally Hosted': 'external-access',
+              'Not Available for Download': 'unavailable',
+            },
+          },
+          ...overrides,
+        },
+      }
+    }
+
+    it('renders a hosting adornment chip with the canonical label for the row', async () => {
+      renderComponent(propsWithHosting('Synapse Hosted'), 'TableEntity')
+      expect(await screen.findByText('Synapse Hosted')).toBeVisible()
+    })
+
+    it('maps portal-specific values to canonical labels via hostingValueMap', async () => {
+      renderComponent(propsWithHosting('Synapse Indexed'), 'TableEntity')
+      expect(await screen.findByText('Synapse Indexed')).toBeVisible()
+      renderComponent(propsWithHosting('Externally Hosted'), 'TableEntity')
+      expect(await screen.findByText('Externally Hosted')).toBeVisible()
+    })
+
+    it('does not render the hosting adornment when the raw value is blank', async () => {
+      renderComponent(propsWithHosting(''), 'TableEntity')
+      // The card should still render, but no hosting chip should appear.
+      await screen.findByTestId('CardFooter')
+      expect(screen.queryByText('Synapse Hosted')).not.toBeInTheDocument()
+      expect(screen.queryByText('Externally Hosted')).not.toBeInTheDocument()
+      expect(screen.queryByText('Not Available')).not.toBeInTheDocument()
+    })
+
+    it('lets an explicit CardTypeAdornment prop override the auto adornment', async () => {
+      renderComponent(
+        {
+          ...propsWithHosting('Synapse Hosted'),
+          CardTypeAdornment: () => <div>CustomAdornment</div>,
+        },
+        'TableEntity',
+      )
+      expect(await screen.findByText('CustomAdornment')).toBeVisible()
+      expect(screen.queryByText('Synapse Hosted')).not.toBeInTheDocument()
+    })
+
+    it('opens the download confirmation when the HOW TO DOWNLOAD link is clicked for a downloadable hosting type', async () => {
+      // Regression: previously the "Click here to add to Synapse download list"
+      // link toggled state whose EntityDownloadConfirmation render target was
+      // gated behind !hostingConfig, so the link was visible but non-functional.
+      mockEntityDownloadConfirmation.mockImplementation(() => (
+        <div data-testid="EntityDownloadConfirmation" />
+      ))
+      const { container } = renderComponent(
+        propsWithHosting('Synapse Hosted', {
+          customSecondaryLabelConfig: {
+            key: 'How to Download',
+            value: 'placeholder',
+            isVisible: () => true,
+          },
+        }),
+        'TableEntity',
+      )
+      const collapse = container.querySelector('.MuiCollapse-root')
+      expect(collapse).toHaveClass('MuiCollapse-hidden')
+
+      const link = await screen.findByText(
+        /Click here to add to Synapse download list/i,
+      )
+      await userEvent.click(link)
+      expect(collapse).not.toHaveClass('MuiCollapse-hidden')
     })
   })
 
@@ -781,6 +894,72 @@ describe('TableRowGenericCard tests', () => {
       await screen.findByTestId('CardFooter')
       expect(screen.queryByText('Label One:')).not.toBeInTheDocument()
       expect(screen.getByText('Label Two:')).toBeVisible()
+    })
+  })
+
+  describe('secondary label empty-array filtering', () => {
+    test('does not render a secondary label when the value is undefined', async () => {
+      const dataWithUndefined = [...data]
+      dataWithUndefined[schema[labelOneColumnName]] =
+        undefined as unknown as string
+
+      renderComponent(
+        {
+          ...propsForNonHeaderMode,
+          genericCardSchema: {
+            ...genericCardSchema,
+            secondaryLabels: [labelOneColumnName, 'labelTwo'],
+          },
+          data: dataWithUndefined,
+        },
+        'TableEntity',
+      )
+
+      // Wait for card to render (labelTwo is present)
+      await screen.findByText(MOCKED_LABELTWO)
+      expect(screen.queryByText(MOCKED_LABELONE)).not.toBeInTheDocument()
+    })
+
+    test('does not render a secondary label when the value is an empty JSON array ("[]")', async () => {
+      const dataWithEmptyArray = [...data]
+      dataWithEmptyArray[schema[labelOneColumnName]] = '[]'
+
+      renderComponent(
+        {
+          ...propsForNonHeaderMode,
+          genericCardSchema: {
+            ...genericCardSchema,
+            secondaryLabels: [labelOneColumnName, 'labelTwo'],
+          },
+          data: dataWithEmptyArray,
+        },
+        'TableEntity',
+      )
+
+      await screen.findByTestId('CardFooter')
+      expect(screen.queryByText('[]')).not.toBeInTheDocument()
+      expect(screen.queryByText(MOCKED_LABELONE)).not.toBeInTheDocument()
+    })
+
+    test('does not render a secondary label when the value is a JSON array containing a single empty string (\'[""]\')', async () => {
+      const dataWithEmptyStringArray = [...data]
+      dataWithEmptyStringArray[schema[labelOneColumnName]] = '[""]'
+
+      renderComponent(
+        {
+          ...propsForNonHeaderMode,
+          genericCardSchema: {
+            ...genericCardSchema,
+            secondaryLabels: [labelOneColumnName, 'labelTwo'],
+          },
+          data: dataWithEmptyStringArray,
+        },
+        'TableEntity',
+      )
+
+      await screen.findByTestId('CardFooter')
+      expect(screen.queryByText('[""]')).not.toBeInTheDocument()
+      expect(screen.queryByText(MOCKED_LABELONE)).not.toBeInTheDocument()
     })
   })
 })

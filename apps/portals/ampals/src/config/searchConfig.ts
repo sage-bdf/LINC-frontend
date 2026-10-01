@@ -3,10 +3,6 @@ import { PortalSearchTabConfig } from '@sage-bionetworks/synapse-portal-framewor
 
 export const searchPageTabs = [
   {
-    title: 'Programs',
-    path: 'Programs',
-  },
-  {
     title: 'Collections',
     path: 'Collections',
   },
@@ -21,8 +17,7 @@ export const searchPageTabs = [
 ] as const satisfies PortalSearchTabConfig[]
 
 export const portalSearchPageConfigs = [
-  configs.programs,
-  configs.collections,
-  configs.datasets,
+  configs.collectionsSearch,
+  configs.datasetsSearch,
   configs.files,
 ]

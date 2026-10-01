@@ -99,7 +99,7 @@ function isLeafNode(node: TreeNode) {
       // Entity is not a container
       !isContainerType(getEntityTypeFromHeader(node)) ||
       // OR Children have been fetched (nonnull) and there are 0 children
-      (node.children != null && node.children.length === 0)
+      node.children?.length === 0
     )
   }
 }
@@ -281,7 +281,7 @@ export function Node(
       toggleExpand()
     }
     // Intentionally only toggle the expanded state when isSelected changes, otherwise the node cannot be un-expanded
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [isSelected])
 
   /**

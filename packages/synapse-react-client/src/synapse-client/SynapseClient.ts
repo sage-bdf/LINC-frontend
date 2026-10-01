@@ -1,4 +1,3 @@
-import { ACCESS_TOKEN_COOKIE_KEY, getCookieDomain, OAuth2State } from '@/utils'
 import {
   ACCESS_APPROVAL,
   ACCESS_APPROVAL_BY_ID,
@@ -67,6 +66,8 @@ import {
   START_CHAT_ASYNC,
   TABLE_QUERY_ASYNC_GET,
   TABLE_QUERY_ASYNC_START,
+  SEARCH_QUERY_ASYNC_GET,
+  SEARCH_QUERY_ASYNC_START,
   TEAM,
   TEAM_ID_MEMBER_ID,
   TEAM_ID_MEMBER_ID_WITH_NOTIFICATION,
@@ -94,18 +95,30 @@ import {
   WIKI_PAGE_ID,
 } from '@/utils/APIConstants'
 import appendFinalQueryParamKey from '@/utils/appendFinalQueryParamKey'
-import { BackendDestinationEnum, getEndpoint } from '@/utils/functions'
+import {
+  BackendDestinationEnum,
+  getEndpoint,
+} from '@/utils/functions/getEndpoint'
 import { calculateFriendlyFileSize } from '@/utils/functions/calculateFriendlyFileSize'
 import { dispatchDownloadListChangeEvent } from '@/utils/functions/dispatchDownloadListChangeEvent'
 import { removeUndefined } from '@/utils/functions/ObjectUtils'
 import { sanitize } from '@/utils/functions/SanitizeHtmlUtils'
 import * as SynapseConstants from '@/utils/SynapseConstants'
-import { DATETIME_UTC_COOKIE_KEY } from '@/utils/SynapseConstants'
+import {
+  ACCESS_TOKEN_COOKIE_KEY,
+  CSRF_TOKEN_STORAGE_KEY,
+  DATETIME_UTC_COOKIE_KEY,
+} from '@/utils/SynapseConstants'
 import {
   SynapseClient as SynapseOpenAPIClient,
   DoiAssociation,
   EntityType,
+  OAuthValidationRequestProviderEnum,
   ViewEntityType,
+  SearchIndexQuery,
+  SearchQueryResults,
+  AgentChatRequest,
+  AgentChatResponse,
 } from '@sage-bionetworks/synapse-client'
 import { TwoFactorAuthErrorResponse } from '@sage-bionetworks/synapse-client/generated/models/TwoFactorAuthErrorResponse'
 import {
@@ -135,8 +148,6 @@ import {
   AddPartResponse,
   AddToDownloadListRequest,
   AddToDownloadListResponse,
-  AgentChatRequest,
-  AgentChatResponse,
   AgentSession,
   AliasCheckRequest,
   AliasCheckResponse,
@@ -207,7 +218,6 @@ import {
   EvaluationSubmission as EvaluationSubmission,
   FavoriteSortBy,
   FavoriteSortDirection,
-  FeatureFlags,
   FileEntity,
   FileHandle,
   FileHandleAssociateType,
@@ -342,14 +352,16 @@ import { JSONSchema7 } from 'json-schema'
 import { memoize } from 'lodash-es'
 import SparkMD5 from 'spark-md5'
 import { SetOptional } from 'type-fest'
-import UniversalCookies from 'universal-cookie'
+import Cookies from 'js-cookie'
 import { delay, doDelete, doGet, doPost, doPut } from './HttpClient'
 import {
   allowNotFoundError,
   isOutsideSynapseOrg,
   returnIfTwoFactorAuthError,
 } from './SynapseClientUtils'
-import { CSRF_TOKEN_STORAGE_KEY } from '@/utils/hooks'
+import { OAuth2State } from '@/utils/types/OAuth2State'
+import { getCookieDomain } from '@/utils/AppUtils/AppUtils'
+import { FeatureFlags } from '@/utils/featureflag/FeatureFlags'
 
 // Max size file that we will allow the caller to read into memory (5MB)
 const MAX_JS_FILE_DOWNLOAD_SIZE = 5242880
@@ -579,6 +591,43 @@ export const getQueryTableAsyncJobResults = async (
 }
 
 /**
+ * @param searchQueryRequest
+ * @param accessToken
+ * @param setCurrentAsyncStatus
+ */
+export const getSearchQueryAsyncJobResults = async (
+  searchIndexQuery: SearchIndexQuery,
+  accessToken?: string,
+  setCurrentAsyncStatus?: (
+    result: AsynchronousJobStatus<SearchIndexQuery, SearchQueryResults>,
+  ) => void,
+): Promise<AsynchronousJobStatus<SearchIndexQuery, SearchQueryResults>> => {
+  // The generated DslQuery/BoolQuery ToJSON
+  // functions strip any field not in their interface (e.g. `terms`, `range` inside
+  // bool.filter), producing empty objects and breaking filter clauses.
+  // Only `responseParts` (a Set) needs manual conversion; everything else is a
+  // plain JSON-serializable value.
+  const serialized = {
+    ...searchIndexQuery,
+    responseParts: searchIndexQuery.responseParts
+      ? [...searchIndexQuery.responseParts]
+      : undefined,
+  }
+  const asyncJobId = await doPost<AsyncJobId>(
+    SEARCH_QUERY_ASYNC_START,
+    serialized,
+    accessToken,
+    BackendDestinationEnum.REPO_ENDPOINT,
+  )
+  return getAsyncResultFromJobId<SearchIndexQuery, SearchQueryResults>(
+    asyncJobId.token,
+    SEARCH_QUERY_ASYNC_GET(asyncJobId.token),
+    accessToken,
+    setCurrentAsyncStatus,
+  )
+}
+
+/**
  * https://rest-docs.synapse.org/rest/POST/entity/id/table/query/nextPage/async/start.html
  * @param {*} queryBundleRequest
  * @param {*} accessToken
@@ -750,6 +799,31 @@ export const oAuthSessionRequest = (
 }
 
 /**
+ * Bind an OAuth identity to the authenticated user's account without an alias.
+ * Used for providers like NIH RAS that do not supply an alias.
+ * https://rest-docs.synapse.org/rest/POST/oauth2/identity.html
+ */
+export const oAuthIdentityRequest = async (
+  provider: OAuthValidationRequestProviderEnum,
+  authenticationCode: string,
+  redirectUrl: string,
+): Promise<void> => {
+  // Web app may not have discovered the access token by this point in init.
+  // Look for the access token ourselves before binding.
+  const accessToken = await getAccessTokenFromCookie()
+  return new SynapseOpenAPIClient({
+    basePath: getEndpoint(BackendDestinationEnum.REPO_ENDPOINT),
+    accessToken,
+  }).authenticationServicesClient.postAuthV1Oauth2Identity({
+    oAuthValidationRequest: {
+      provider,
+      authenticationCode,
+      redirectUrl,
+    },
+  })
+}
+
+/**
  * Fetch the current 2FA status for the user.
  * https://rest-docs.synapse.org/rest/GET/2fa.html
  */
@@ -867,11 +941,13 @@ export const createEntity = <T extends Entity>(
  */
 export const createProject = (
   name: string,
+  description: string | undefined,
   accessToken: string | undefined,
 ): Promise<Entity> => {
   return createEntity(
     {
       name,
+      description,
       concreteType: 'org.sagebionetworks.repo.model.Project',
     },
     accessToken,
@@ -1993,8 +2069,7 @@ export const updateWikiPage = (
 
 export const isInSynapseExperimentalMode = (): boolean => {
   // bang bang, you're a boolean!
-  const cookies = new UniversalCookies()
-  return !!cookies.get(SynapseConstants.EXPERIMENTAL_MODE_COOKIE)
+  return !!Cookies.get(SynapseConstants.EXPERIMENTAL_MODE_COOKIE)
 }
 
 /**
@@ -2007,16 +2082,14 @@ export const setAccessTokenCookie = async (
   token: string | undefined,
 ): Promise<void> => {
   if (isOutsideSynapseOrg()) {
-    const cookies = new UniversalCookies()
     if (!token) {
-      cookies.remove(ACCESS_TOKEN_COOKIE_KEY, { path: '/' })
-      // See - https://github.com/reactivestack/cookies/issues/189
+      Cookies.remove(ACCESS_TOKEN_COOKIE_KEY, { path: '/' })
       await delay(100)
     } else {
       // sets cookie
-      cookies.set(ACCESS_TOKEN_COOKIE_KEY, token, {
+      Cookies.set(ACCESS_TOKEN_COOKIE_KEY, token, {
         // expires in 10 days (see SWC-6190)
-        maxAge: 60 * 60 * 24 * 10,
+        expires: 10,
         path: '/',
         domain: getCookieDomain(),
       })
@@ -2042,8 +2115,7 @@ export const getAccessTokenFromCookie = async (): Promise<
   string | undefined
 > => {
   if (isOutsideSynapseOrg()) {
-    const cookies = new UniversalCookies()
-    return Promise.resolve(cookies.get(ACCESS_TOKEN_COOKIE_KEY) as string)
+    return Promise.resolve(Cookies.get(ACCESS_TOKEN_COOKIE_KEY) as string)
   }
   return doGet<string>(
     '/Portal/sessioncookie?validate=true',
@@ -2054,8 +2126,7 @@ export const getAccessTokenFromCookie = async (): Promise<
 }
 
 export const getUseUtcTimeFromCookie = () => {
-  const cookies = new UniversalCookies()
-  return cookies.get(DATETIME_UTC_COOKIE_KEY) === 'true'
+  return Cookies.get(DATETIME_UTC_COOKIE_KEY) === 'true'
 }
 
 export const getPrincipalAliasRequest = (
@@ -3510,9 +3581,8 @@ export const searchAccessRequirements = (
  * @returns {AccessRequirementStatus}
  */
 export function getAccessRequirementStatus<
-  T extends
-    | AccessRequirementStatus
-    | ManagedACTAccessRequirementStatus = AccessRequirementStatus,
+  T extends AccessRequirementStatus | ManagedACTAccessRequirementStatus =
+    AccessRequirementStatus,
 >(accessToken: string | undefined, requirementId: string | number): Promise<T> {
   return doGet<T>(
     ACCESS_REQUIREMENT_STATUS(requirementId),
@@ -3646,15 +3716,11 @@ export const getAllOfPaginatedService = async <T>(
   const results: T[] = []
 
   while (existsMoreData) {
-    try {
-      const data = await fn(limit, offset)
-      results.push(...data.results)
-      offset += data.results.length
-      if (data.results.length < limit) {
-        existsMoreData = false
-      }
-    } catch (e) {
-      throw Error(`Error on getting paginated results ${e}`)
+    const data = await fn(limit, offset)
+    results.push(...data.results)
+    offset += data.results.length
+    if (data.results.length < limit) {
+      existsMoreData = false
     }
   }
 
@@ -3675,21 +3741,17 @@ export async function getAllOfNextPageTokenPaginatedService<T>(
   const results: T[] = []
 
   while (existsMoreData) {
-    try {
-      const data = await fn(nextPageToken)
-      // Some object models use `results`, others use `page`
-      if ('results' in data) {
-        results.push(...data.results)
-      } else if ('page' in data) {
-        results.push(...data.page)
-      }
-      nextPageToken = data.nextPageToken
+    const data = await fn(nextPageToken)
+    // Some object models use `results`, others use `page`
+    if ('results' in data) {
+      results.push(...data.results)
+    } else if ('page' in data) {
+      results.push(...data.page)
+    }
+    nextPageToken = data.nextPageToken
 
-      if (!nextPageToken) {
-        existsMoreData = false
-      }
-    } catch (e) {
-      throw Error(`Error on getting paginated results ${e}`)
+    if (!nextPageToken) {
+      existsMoreData = false
     }
   }
 

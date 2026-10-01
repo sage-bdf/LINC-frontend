@@ -1,19 +1,84 @@
 import { dateTimeColumn } from '@/components/DataGrid/columns/DateTimeColumn'
 import { EnumeratedValue } from '@/utils/jsonschema/getEnumeratedValues'
 import { FlatTypeInfo } from '@/utils/jsonschema/getType'
+import { SchemaPropertyInfo } from '@/utils/jsonschema/getSchemaPropertyInfo'
 import {
+  CellComponent,
+  CellProps,
   Column,
   createTextColumn,
-  floatColumn,
   keyColumn,
 } from '@sage-bionetworks/react-datasheet-grid'
 import { autocompleteColumn } from '../columns/AutocompleteColumn'
 import { autocompleteMultipleEnumColumn } from '../columns/AutocompleteMultipleEnumColumn'
+import { numberColumn } from '../columns/NumberColumn'
 import {
   calculateDefaultColumnWidth,
   HeaderOptions,
 } from './calculateColumnWidth'
 import { ColumnHeaderWithTooltip } from '../components/ColumnHeaderWithTooltip'
+import { Tooltip } from '@mui/material'
+import { SmartToyTwoTone } from '@mui/icons-material'
+import type { DataGridRow } from '../DataGridTypes'
+import { wrapPasteValueWithSchemaCoercion } from './schemaAwarePasteValue'
+import { getEmptyValue } from './getEmptyValue'
+
+/**
+ * Wraps a column cell component to overlay change-attribution indicators:
+ * - Non-agent changes: invisible 7×7px tooltip trigger over the CSS triangle (top-right).
+ * - Agent changes: robot icon (1em, vertically centered on the right) with no triangle.
+ */
+function withChangeIndicatorTooltip<T, C>(
+  OriginalComponent: CellComponent<T, C>,
+  colName: string,
+): CellComponent<T, C> {
+  function CellWithTooltip(props: CellProps<T, C>) {
+    const changeInfo = (props.rowData as DataGridRow).__cellChangeInfo?.[
+      colName
+    ]
+    const isAgent =
+      changeInfo?.category === 'own-agent' ||
+      changeInfo?.category === 'other-agent'
+    return (
+      <>
+        <OriginalComponent {...props} />
+        {changeInfo && !isAgent && (
+          <Tooltip title={changeInfo.tooltipText} placement="top-end">
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: 7,
+                height: 7,
+                zIndex: 21,
+                pointerEvents: 'auto',
+              }}
+            />
+          </Tooltip>
+        )}
+        {isAgent && !props.focus && (
+          <Tooltip title={changeInfo.tooltipText} placement="left">
+            <SmartToyTwoTone
+              sx={{
+                fontSize: '1em',
+                alignSelf: 'center',
+                flexShrink: 0,
+                mr: 0.5,
+                zIndex: 21,
+                pointerEvents: 'auto',
+                color: 'grey.400',
+                backgroundColor: 'transparent',
+              }}
+            />
+          </Tooltip>
+        )}
+      </>
+    )
+  }
+  CellWithTooltip.displayName = `CellWithTooltip(${colName})`
+  return CellWithTooltip
+}
 
 type ColumnConfig = {
   columnName: string
@@ -26,16 +91,20 @@ type ColumnConfig = {
   showPinIcon?: boolean
   isPinned?: boolean
   onTogglePin?: () => void
-}
-
-function getHeaderClassName(isRequired: boolean): string {
-  return isRequired ? 'header-cell-required' : 'header-cell'
+  isUpsertKey?: boolean
+  /**
+   * Optional column-level schema info. When provided, paste behavior coerces
+   * empty pasted cells to the schema-correct blank (undefined for optional
+   * columns, null for required columns). Omit to preserve the column impl's
+   * default paste behavior.
+   */
+  schemaPropertyInfo?: SchemaPropertyInfo
 }
 
 function createDeleteValue(columnName: string, isRequired?: boolean) {
   return ({ rowData }: { rowData: Record<string, unknown> }) => ({
     ...rowData,
-    [columnName]: isRequired ? null : undefined,
+    [columnName]: getEmptyValue(isRequired),
   })
 }
 
@@ -43,7 +112,7 @@ function createParseUserInput(isRequired?: boolean) {
   return (value: string) => {
     const trimmedValue = value.trim()
     if (trimmedValue === '') {
-      return isRequired ? null : undefined
+      return getEmptyValue(isRequired)
     }
     return trimmedValue
   }
@@ -63,27 +132,39 @@ function createBaseColumn(config: ColumnConfig, columnImpl: any) {
       headerOptions,
     )
 
+  const keyed = keyColumn(config.columnName, columnImpl)
   return {
-    ...keyColumn(config.columnName, columnImpl),
+    ...keyed,
+    component: withChangeIndicatorTooltip(keyed.component!, config.columnName),
     title: (
       <ColumnHeaderWithTooltip
         name={config.columnName}
         description={config.description}
+        isRequired={config.isRequired}
+        isUpsertKey={config.isUpsertKey}
         showPinIcon={config.showPinIcon}
         isPinned={config.isPinned}
         onTogglePin={config.onTogglePin}
       />
     ),
-    headerClassName: getHeaderClassName(config.isRequired),
     minWidth: width,
     basis: width,
     grow: 0,
     shrink: 0,
     disabled: config.disabled,
     deleteValue: createDeleteValue(config.columnName, config.isRequired),
+    pasteValue: wrapPasteValueWithSchemaCoercion(
+      keyed.pasteValue,
+      config.columnName,
+      config.schemaPropertyInfo,
+    ),
     stickyLeft: config.isPinned,
   }
 }
+
+// JSON Schema formats handled by the date column: `date-time` collects a time of
+// day alongside the date, `date` a calendar date on its own.
+const DATE_COLUMN_FORMATS: ReadonlySet<string> = new Set(['date', 'date-time'])
 
 const COLUMN_FACTORIES = {
   multipleEnum: (config: ColumnConfig) => {
@@ -93,7 +174,7 @@ const COLUMN_FACTORIES = {
         choices: config.enumeratedValues ?? [],
         colType: config.typeInfo?.type || null,
         limitTags: 3,
-        clearValue: config.isRequired ? null : undefined,
+        clearValue: getEmptyValue(config.isRequired),
       }),
     )
   },
@@ -104,13 +185,19 @@ const COLUMN_FACTORIES = {
       autocompleteColumn({
         choices: [true, false],
         colType: 'boolean',
-        clearValue: config.isRequired ? null : undefined,
+        clearValue: getEmptyValue(config.isRequired),
       }),
     )
   },
 
   number: (config: ColumnConfig) => {
-    return createBaseColumn(config, floatColumn)
+    return createBaseColumn(
+      config,
+      numberColumn({
+        colType: config.typeInfo?.type,
+        isRequired: config.isRequired,
+      }),
+    )
   },
 
   enumerated: (config: ColumnConfig) => {
@@ -119,14 +206,15 @@ const COLUMN_FACTORIES = {
       autocompleteColumn({
         choices: config.enumeratedValues ?? [],
         colType: config.typeInfo?.type || null,
-        clearValue: config.isRequired ? null : undefined,
+        clearValue: getEmptyValue(config.isRequired),
       }),
     )
   },
 
-  'date-time': (config: ColumnConfig) => {
+  dateOrDateTime: (config: ColumnConfig) => {
     const columnImpl = dateTimeColumn({
       colType: config.typeInfo?.type || null,
+      format: config.typeInfo?.format,
     })
 
     // Date-time needs special width calculation
@@ -178,8 +266,8 @@ function getColumnType(
       : 'text'
   }
 
-  if (typeInfo.format === 'date-time') {
-    return 'date-time'
+  if (typeInfo.format && DATE_COLUMN_FORMATS.has(typeInfo.format)) {
+    return 'dateOrDateTime'
   }
 
   // Handle arrays - check if it's an array of enums

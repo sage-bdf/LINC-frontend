@@ -4,6 +4,7 @@ import { MouseEvent, Suspense, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import ShowDownloadV2 from 'synapse-react-client/components/DownloadCart/ShowDownloadV2'
 import SageResourcesPopover from 'synapse-react-client/components/SageResourcesPopover/index'
+import { useGetIsUserMemberOfTeam } from 'synapse-react-client/synapse-queries/team/useTeamMembers'
 import { useGetCurrentUserProfile } from 'synapse-react-client/synapse-queries/user/useUserBundle'
 import {
   storeRedirectURLForOneSageLoginAndGotoURL,
@@ -15,10 +16,14 @@ import {
   getEndpoint,
 } from 'synapse-react-client/utils/functions/index'
 import { useOneSageURL } from 'synapse-react-client/utils/hooks/useOneSageURL'
+import HeaderSearchBox from '../HeaderSearchBox'
 import NavLink from '../NavLink'
 import NavUserLink from '../NavUserLink'
 import { usePortalContext } from '../PortalContext'
 import { DropdownNavButton } from './DropdownNavButton'
+import { SearchIndexConfig } from '@/types/portal-util-types'
+
+export type NavbarLayout = 'default' | 'with-sticky-search'
 
 type SynapseSettingLink = {
   text: string
@@ -26,19 +31,73 @@ type SynapseSettingLink = {
   settingSubPath?: string
 }
 
+type NavRoute = {
+  name: string
+  icon?: string
+  path: string
+  children?: { name: string; path: string }[]
+  requiredTeamId?: string
+}
+
 export type NavbarConfig = {
-  routes: {
-    name: string
-    icon?: string
-    path: string
-    children?: { name: string; path: string }[]
-  }[]
+  routes: NavRoute[]
   isPortalsDropdownEnabled: boolean
+  /** Optional override component; defaults to <Navbar /> when omitted */
+  NavbarComponent?: React.ComponentType
+  /** Layout variant; defaults to 'default' when omitted */
+  layout?: NavbarLayout
+  /** Background color for the sticky search nav link bar. Defaults to var(--synapse-secondary-action-color). */
+  stickyNavBackgroundColor?: string
+  /** Text color for the sticky search nav link bar. Defaults to #fff. */
+  stickyNavTextColor?: string
+  /** Search index used to power autocomplete suggestions in the sticky search nav bar. */
+  searchIndexConfig?: SearchIndexConfig
+}
+
+type ConditionalNavRouteProps = {
+  route: NavRoute
+  userId: string
+  onClickedNavLink: () => void
+}
+
+function ConditionalNavRoute({
+  route,
+  userId,
+  onClickedNavLink,
+}: ConditionalNavRouteProps) {
+  const { data: teamMember } = useGetIsUserMemberOfTeam(
+    route.requiredTeamId!,
+    userId,
+    { enabled: !!userId && !!route.requiredTeamId },
+  )
+
+  if (!teamMember) return null
+
+  if (route.children) {
+    return (
+      <DropdownNavButton route={route} onClickedNavLink={onClickedNavLink}>
+        {route.name}
+      </DropdownNavButton>
+    )
+  }
+
+  return (
+    <NavLink
+      to={route.path}
+      className="nav-button-container nav-button center-content"
+    >
+      {route.name}
+    </NavLink>
+  )
 }
 
 const synapseQuickLinks: SynapseSettingLink[] = [
   {
     text: 'Profile',
+  },
+  {
+    text: 'Favorites',
+    settingSubPath: 'favorites',
   },
   {
     text: 'Projects',
@@ -54,12 +113,24 @@ const synapseQuickLinks: SynapseSettingLink[] = [
   },
 ]
 
-export default function Navbar() {
+type NavbarProps = {
+  /** Overrides navbarConfig.layout when provided */
+  layout?: NavbarLayout
+}
+
+export default function Navbar({ layout: layoutProp }: NavbarProps = {}) {
   const { navbarConfig, logoHeaderConfig } = usePortalContext()
   const { isAuthenticated } = useSynapseContext()
   const navigate = useNavigate()
   const { data: userProfile } = useGetCurrentUserProfile()
-  const { isPortalsDropdownEnabled } = navbarConfig
+  const {
+    isPortalsDropdownEnabled,
+    stickyNavBackgroundColor,
+    stickyNavTextColor,
+    searchIndexConfig,
+  } = navbarConfig
+  const layout: NavbarLayout = layoutProp ?? navbarConfig.layout ?? 'default'
+  const isStickySearch = layout === 'with-sticky-search'
   const [showMenu, setShowMenu] = useState(false)
   const navRef = useRef<HTMLElement>(null)
 
@@ -135,30 +206,55 @@ export default function Navbar() {
     setProfileMenuAnchorEl(null)
   }
 
+  const navLogoContainer = (
+    <div className="nav-logo-container">
+      <NavLink
+        onClick={goToTop}
+        style={{ display: 'flex', alignItems: 'center' }}
+        to="/"
+        id="home-link"
+      >
+        <>
+          {imageElement} {nameElement}
+        </>
+      </NavLink>
+    </div>
+  )
+
   return (
     <>
       <Box
         ref={navRef}
         component={'nav'}
         className={
-          !showMenu
-            ? 'flex-display nav top-nav'
-            : 'flex-display nav top-nav mb-active'
+          `flex-display nav top-nav mui-fixed` +
+          (showMenu ? ' mb-active' : '') +
+          (isStickySearch ? ' top-nav--with-sticky-search' : '')
         }
-        sx={RESPONSIVE_SIDE_PADDING}
+        sx={isStickySearch ? undefined : RESPONSIVE_SIDE_PADDING}
+        style={
+          isStickySearch
+            ? ({
+                '--sticky-nav-bg': stickyNavBackgroundColor,
+                '--sticky-nav-color': stickyNavTextColor,
+              } as React.CSSProperties)
+            : undefined
+        }
       >
-        <div className="nav-logo-container">
-          <NavLink
-            onClick={goToTop}
-            style={{ display: 'flex', alignItems: 'center' }}
-            to="/"
-            id="home-link"
-          >
-            <>
-              {imageElement} {nameElement}
-            </>
-          </NavLink>
-        </div>
+        {isStickySearch ? (
+          <div className="nav-logo-and-search-container">
+            <>{navLogoContainer}</>
+            <HeaderSearchBox
+              variant="v3"
+              path="/Search"
+              searchPlaceholder="Search"
+              hideChatOption={true}
+              searchIndexConfig={searchIndexConfig}
+            />
+          </div>
+        ) : (
+          <>{navLogoContainer}</>
+        )}
         <div
           className="nav-mobile-menu-btn mb-open"
           onClick={() => {
@@ -345,6 +441,16 @@ export default function Navbar() {
             </>
           )}
           {navbarConfig.routes.toReversed().map(route => {
+            if (route.requiredTeamId) {
+              return (
+                <ConditionalNavRoute
+                  key={route.path}
+                  route={route}
+                  userId={userProfile?.ownerId ?? ''}
+                  onClickedNavLink={() => setShowMenu(false)}
+                />
+              )
+            }
             if (route.children) {
               return (
                 <DropdownNavButton

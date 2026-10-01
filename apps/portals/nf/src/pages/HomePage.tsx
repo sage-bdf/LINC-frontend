@@ -1,10 +1,25 @@
 import NFHeader from '@sage-bionetworks/synapse-portal-framework/components/nf/NFHeader'
 import { SectionLayout } from '@sage-bionetworks/synapse-portal-framework/components/SectionLayout'
-import type { MetaDescriptor } from 'react-router'
-import { CardContainerLogic } from 'synapse-react-client/components/CardContainerLogic/CardContainerLogic'
-import { Goals } from 'synapse-react-client/components/Goals/Goals'
-import RssFeedCards from 'synapse-react-client/components/RssFeedCards/RssFeedCards'
-import { UserCardListRotate } from 'synapse-react-client/components/UserCardList/UserCardListRotate'
+import { createQueryClientForLoader } from '@sage-bionetworks/synapse-portal-framework/utils/createQueryClientForLoader'
+import { mergeMeta } from '@sage-bionetworks/synapse-portal-framework/utils/mergeMeta'
+import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
+import type { MetaArgs, MetaDescriptor } from 'react-router'
+import { useLoaderData } from 'react-router'
+import {
+  CardContainerLogic,
+  prefetchCardContainerLogicData,
+} from 'synapse-react-client/components/CardContainerLogic/CardContainerLogic'
+import {
+  Goals,
+  prefetchGoals,
+} from 'synapse-react-client/components/Goals/Goals'
+import RssFeedCards, {
+  prefetchRssFeed,
+} from 'synapse-react-client/components/RssFeedCards/RssFeedCards'
+import {
+  UserCardListRotate,
+  prefetchUserCardListRotate,
+} from 'synapse-react-client/components/UserCardList/UserCardListRotate'
 import * as SynapseConstants from 'synapse-react-client/utils/SynapseConstants'
 import { fundersSql, peopleSql, topProjectsSql } from '../config/resources'
 import { columnAliases } from '../config/synapseConfigs/commonProps'
@@ -18,10 +33,10 @@ import {
   studyColumnIconConfigs,
 } from '../config/synapseConfigs/studies'
 
-export function meta(): MetaDescriptor[] {
+export function meta(args: MetaArgs): MetaDescriptor[] {
   const portalDescription = import.meta.env.VITE_PORTAL_DESCRIPTION
   const portalUrl = `https://${import.meta.env.VITE_PORTAL_KEY}.synapse.org`
-  return [
+  return mergeMeta(args, [
     { title: import.meta.env.VITE_PORTAL_NAME },
     { name: 'description', content: portalDescription },
     {
@@ -56,21 +71,45 @@ export function meta(): MetaDescriptor[] {
         alternateName: 'Neurofibromatosis Data Portal',
       },
     },
-  ]
+  ])
 }
 
-const limit = 3
+const STUDIES_INITIAL_LIMIT = 3
+
+const FEATURED_USER_CARD_SQL = `${peopleSql} where isFeatured=true`
+const FEATURED_USER_CARD_COUNT = 3
+
+const RSS_URL = 'https://news.nf.synapse.org'
+const RSS_FILTER = { value: 'featured' }
+
+const GOALS_ENTITY_ID = 'syn23516796'
+
+export async function loader() {
+  const queryClient = createQueryClientForLoader()
+  await Promise.all([
+    prefetchGoals(queryClient, GOALS_ENTITY_ID),
+    prefetchCardContainerLogicData(queryClient, newStudiesSql),
+    prefetchCardContainerLogicData(queryClient, fundersSql),
+    prefetchCardContainerLogicData(queryClient, topProjectsSql),
+    prefetchUserCardListRotate(queryClient, FEATURED_USER_CARD_SQL, {
+      count: FEATURED_USER_CARD_COUNT,
+    }),
+    prefetchRssFeed(queryClient, RSS_URL, RSS_FILTER),
+  ])
+  return { dehydratedState: dehydrate(queryClient) }
+}
 
 export default function HomePage() {
+  const { dehydratedState } = useLoaderData<typeof loader>()
   return (
-    <>
+    <HydrationBoundary state={dehydratedState}>
       <NFHeader />
       <SectionLayout
         title={'Resource Overview'}
         centerTitle
         ContainerProps={{ className: 'home-spacer' }}
       >
-        <Goals entityId={'syn23516796'} />
+        <Goals entityId={GOALS_ENTITY_ID} />
       </SectionLayout>
       <div className={'home-bg-dark'}>
         <SectionLayout
@@ -79,7 +118,7 @@ export default function HomePage() {
           ContainerProps={{ className: 'home-spacer' }}
         >
           <CardContainerLogic
-            initialLimit={limit}
+            initialLimit={STUDIES_INITIAL_LIMIT}
             columnAliases={columnAliases}
             sql={newStudiesSql}
             cardConfiguration={studyCardConfiguration}
@@ -92,18 +131,16 @@ export default function HomePage() {
         ContainerProps={{ className: 'home-spacer' }}
       >
         <UserCardListRotate
-          sql={`${peopleSql} where isFeatured=true`}
-          count={3}
+          sql={FEATURED_USER_CARD_SQL}
+          count={FEATURED_USER_CARD_COUNT}
           size={SynapseConstants.LARGE_USER_CARD}
           useQueryResultUserData={true}
-          // summaryLink: 'Explore/People',
-          // summaryLinkText: 'Explore All People',
         />
       </SectionLayout>
       <SectionLayout
         title={'Our Partners'}
         centerTitle
-        ContainerProps={{ className: 'home-spacer' }}
+        ContainerProps={{ className: 'home-spacer nf-partners-section' }}
       >
         <CardContainerLogic
           columnAliases={columnAliases}
@@ -132,19 +169,19 @@ export default function HomePage() {
           ContainerProps={{ className: 'home-spacer' }}
         >
           <RssFeedCards
-            url={'https://news.nfdataportal.org'}
+            url={RSS_URL}
             itemsToShow={3}
             allowCategories={[
-              'Newsletter',
+              'New Feature',
+              'Researcher Spotlight',
+              'Press Release',
               'Hackathon',
               'Publication',
               'Funding',
             ]}
             // mailChimpListName: 'NF quarterly newsletter',
             // mailChimpUrl:'https://sagebase.us7.list-manage.com/subscribe/post?u=abcdefghi...',
-            filter={{
-              value: 'featured',
-            }}
+            filter={RSS_FILTER}
           />
         </SectionLayout>
       </div>
@@ -186,6 +223,6 @@ export default function HomePage() {
           }}
         />
       </SectionLayout>
-    </>
+    </HydrationBoundary>
   )
 }

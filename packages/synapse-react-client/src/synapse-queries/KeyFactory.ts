@@ -11,11 +11,15 @@ import {
   USER_BUNDLE_MASK_VERIFICATION_SUBMISSION,
 } from '@/utils/SynapseConstants'
 import {
+  AccessRequestListRequest,
   AddToDownloadListStatsRequest,
   DiscussionSearchRequest,
+  EDucTemplateListRequest,
   EntityLookupRequest,
+  FormTemplateSearchRequest,
   GetRepoV1DoiAssociationRequest,
   GetRepoV1DoiRequest,
+  ListCurationTaskRequest,
   ListGridSessionsRequest,
   SuggestionQuery,
   UploadToTablePreviewRequest,
@@ -56,6 +60,7 @@ import {
   ViewColumnModelRequest,
   WikiPageKey,
 } from '@sage-bionetworks/synapse-types'
+import { SearchIndexQuery } from '@sage-bionetworks/synapse-client'
 import { QueryKey } from '@tanstack/react-query'
 
 const entityQueryKeyObjects = {
@@ -201,6 +206,9 @@ const ACCESS_REQUIREMENT_QUERY_KEY = 'accessRequirement'
 const ROOT_WIKI_PAGE_KEY_QUERY_KEY = 'rootWikiPageKey'
 const WIKI_PAGE_QUERY_KEY = 'wikiPage'
 const DATA_ACCESS_SUBMISSION_QUERY_KEY = 'dataAccessSubmission'
+const DATA_ACCESS_REQUEST_QUERY_KEY = 'dataAccessRequest'
+const EDUC_TEMPLATE_QUERY_KEY = 'eDucTemplate'
+const FORM_TEMPLATE_QUERY_KEY = 'formTemplate'
 
 /**
  * Returns a react-query Query Key.
@@ -389,6 +397,13 @@ export class KeyFactory {
         infinite,
       ),
     )
+  }
+
+  public getSearchQueryResultWithAsyncStatusQueryKey(
+    request: SearchIndexQuery,
+    infinite: boolean,
+  ) {
+    return this.getKey('searchQueryResult', infinite, request)
   }
 
   public getRootWikiPageKeyQueryKey(
@@ -587,8 +602,114 @@ export class KeyFactory {
     return this.getKey('approvedSubmissionInfo', request)
   }
 
+  // Returns key that can be used to invalidate all data access request queries
+  public getDataAccessRequestQueryKey() {
+    return this.getKey(DATA_ACCESS_REQUEST_QUERY_KEY)
+  }
+
+  public listDataAccessRequestsQueryKey(params?: AccessRequestListRequest) {
+    return this.getKey(DATA_ACCESS_REQUEST_QUERY_KEY, 'list', params)
+  }
+
+  public listAllDataAccessRequestsQueryKey(
+    params?: Omit<AccessRequestListRequest, 'nextPageToken'>,
+  ) {
+    return this.getKey(DATA_ACCESS_REQUEST_QUERY_KEY, 'list', 'all', params)
+  }
+
+  public getDataAccessRequestPreviewQueryKey(requestId: string) {
+    return this.getKey(
+      DATA_ACCESS_REQUEST_QUERY_KEY,
+      requestId,
+      'signature',
+      'preview',
+    )
+  }
+
+  public getDataAccessRequestSignatureQueryKey(requestId: string) {
+    return this.getKey(DATA_ACCESS_REQUEST_QUERY_KEY, requestId, 'signature')
+  }
+
+  public getDataAccessRequestSignatureStatusQueryKey(requestId: string) {
+    return this.getKey(
+      DATA_ACCESS_REQUEST_QUERY_KEY,
+      requestId,
+      'signature',
+      'status',
+    )
+  }
+
+  public getDataAccessRequestSignatureFileHandleIdQueryKey(requestId: string) {
+    return this.getKey(
+      DATA_ACCESS_REQUEST_QUERY_KEY,
+      requestId,
+      'signature',
+      'filehandleId',
+    )
+  }
+
+  public getDataAccessRequestSignatureQuotaQueryKey(requestId: string) {
+    return this.getKey(
+      DATA_ACCESS_REQUEST_QUERY_KEY,
+      requestId,
+      'signature',
+      'quota',
+    )
+  }
+
+  public getDataAccessRequestSignaturePrecheckQueryKey(requestId: string) {
+    return this.getKey(
+      DATA_ACCESS_REQUEST_QUERY_KEY,
+      requestId,
+      'signature',
+      'precheck',
+    )
+  }
+
+  // Returns key that can be used to invalidate all eDUC template queries
+  public getEDucTemplateQueryKey() {
+    return this.getKey(EDUC_TEMPLATE_QUERY_KEY)
+  }
+
+  public listEDucTemplatesQueryKey(params?: EDucTemplateListRequest) {
+    return this.getKey(EDUC_TEMPLATE_QUERY_KEY, 'list', params)
+  }
+
+  public getEDucTemplateValidationQueryKey(templateId: string) {
+    return this.getKey(EDUC_TEMPLATE_QUERY_KEY, templateId, 'validation')
+  }
+
+  // Returns key that can be used to invalidate all form template queries, e.g. after a create/update
+  public getFormTemplateQueryKey() {
+    return this.getKey(FORM_TEMPLATE_QUERY_KEY)
+  }
+
+  public getFormTemplateByIdQueryKey(templateId: string) {
+    return this.getKey(FORM_TEMPLATE_QUERY_KEY, templateId)
+  }
+
+  public getFormTemplateVersionQueryKey(
+    templateId: string,
+    versionNumber: number,
+  ) {
+    return this.getKey(
+      FORM_TEMPLATE_QUERY_KEY,
+      templateId,
+      'version',
+      versionNumber,
+    )
+  }
+
+  public searchFormTemplatesQueryKey(params?: FormTemplateSearchRequest) {
+    return this.getKey(FORM_TEMPLATE_QUERY_KEY, 'search', params)
+  }
+
   public getValidationSchemaQueryKey(schema$id: string) {
     return this.getKey('validationSchema', schema$id)
+  }
+
+  public getRegisteredSchemaQueryKey(schema$id: string) {
+    return this.getKey('registeredSchema', schema$id)
   }
 
   public getPresignedUrlContentQueryKey(
@@ -707,6 +828,10 @@ export class KeyFactory {
     return this.getKey('thread', threadId)
   }
 
+  public getThreadForSubmissionQueryKey(submissionId: string | number) {
+    return this.getKey('thread', 'submission', submissionId)
+  }
+
   public getThreadBodyQueryKey(threadId: string, messageKey: string) {
     return this.getKey('thread', threadId, messageKey)
   }
@@ -794,8 +919,19 @@ export class KeyFactory {
     return this.getKey('team', teamId, 'member', userId)
   }
 
+  public getIsPrincipalIdSelfOrTeamMemberQueryKey(
+    principalId: string,
+    userId: string,
+  ) {
+    return this.getKey('principal', userId, principalId, 'isSelfOrTeamMember')
+  }
+
   public getMembershipStatusQueryKey(teamId: string, userId?: string) {
     return this.getKey('team', teamId, 'membershipStatus', userId)
+  }
+
+  public getAllOpenMembershipInvitationsQueryKey() {
+    return this.getKey('openMembershipInvitations')
   }
 
   public getAllOpenMembershipInvitationsForUserQueryKey(userId: string) {
@@ -909,6 +1045,10 @@ export class KeyFactory {
     return this.getKey('user', userId, 'profile')
   }
 
+  public getUserProfilesWithProfilePicAttachedQueryKey(principalIds: string[]) {
+    return this.getKey('userProfilesWithProfilePicAttached', principalIds)
+  }
+
   public getPrincipalAliasQueryKey(request: PrincipalAliasRequest) {
     return this.getKey('principalAlias', request)
   }
@@ -937,6 +1077,10 @@ export class KeyFactory {
 
   public getBatchOfFiles(request: BatchFileRequest) {
     return this.getKey('fileBatch', request)
+  }
+
+  public getFileHandleQueryKey(fileHandleId: string) {
+    return this.getKey('fileHandle', fileHandleId)
   }
 
   public getChatAgentTraceKey(request: TraceEventsRequest) {
@@ -1040,12 +1184,28 @@ export class KeyFactory {
     return this.getKey('gridSession', 'list', request)
   }
 
-  public getCurationTaskKey(taskId: number) {
+  public getGridReplicaListKey(sessionId: string) {
+    return this.getKey('gridSession', sessionId, 'replicas')
+  }
+
+  public getCurationTaskIdKey(taskId: number) {
     return this.getKey('curationTask', taskId)
   }
 
-  public getCurationTaskListKey(projectId: string) {
-    return this.getKey('curationTask', 'list', projectId)
+  public getCurationTaskIdTaskKey(taskId: number) {
+    return this.getKey('curationTask', taskId, 'task')
+  }
+
+  public getCurationTaskIdStatusKey(taskId: number) {
+    return this.getKey('curationTask', taskId, 'status')
+  }
+
+  public getCurationTaskListKey(request: ListCurationTaskRequest) {
+    return this.getKey('curationTask', 'list', request)
+  }
+
+  public getAllCurationTaskListKey() {
+    return this.getKey('curationTask', 'list')
   }
 
   public getCsvPreviewQueryKey(request: UploadToTablePreviewRequest) {
@@ -1070,5 +1230,26 @@ export class KeyFactory {
 
   public getAsyncJobStatusQueryKey(jobId: string) {
     return this.getKey('asyncJobStatus', jobId)
+  }
+
+  public getListOrganizationsQueryKey() {
+    return this.getKey('jsonSchema', 'organization', 'list')
+  }
+
+  public getListJsonSchemasQueryKey(organizationName: string) {
+    return this.getKey('jsonSchema', 'list', organizationName)
+  }
+
+  public getListJsonSchemaVersionsQueryKey(
+    organizationName: string,
+    schemaName: string,
+  ) {
+    return this.getKey(
+      'jsonSchema',
+      'version',
+      'list',
+      organizationName,
+      schemaName,
+    )
   }
 }

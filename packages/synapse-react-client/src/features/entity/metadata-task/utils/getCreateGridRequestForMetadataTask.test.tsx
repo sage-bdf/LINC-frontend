@@ -1,40 +1,54 @@
 import { describe, it, expect } from 'vitest'
 import { getCreateGridRequestForMetadataTask } from './getCreateGridRequestForMetadataTask'
-import { CurationTaskProperties } from '@sage-bionetworks/synapse-client'
+import { GridSupportedTaskProperties } from '@sage-bionetworks/synapse-client'
+
+const FILE_BASED =
+  'org.sagebionetworks.repo.model.curation.metadata.FileBasedMetadataTaskProperties'
+const RECORD_BASED =
+  'org.sagebionetworks.repo.model.curation.metadata.RecordBasedMetadataTaskProperties'
+const GRID_REQUEST_CONCRETE_TYPE =
+  'org.sagebionetworks.repo.model.grid.CreateGridRequest'
 
 describe('getCreateGridRequestForMetadataTask', () => {
-  it('returns correct CreateGridRequest for FileBasedMetadataTaskProperties', () => {
-    const props = {
-      concreteType:
-        'org.sagebionetworks.repo.model.curation.metadata.FileBasedMetadataTaskProperties',
-      fileViewId: 'syn123',
-    } satisfies CurationTaskProperties
-    const result = getCreateGridRequestForMetadataTask(props)
-    expect(result).toEqual({
-      concreteType: 'org.sagebionetworks.repo.model.grid.CreateGridRequest',
-      initialQuery: { sql: 'SELECT * FROM syn123' },
-    })
+  it('throws when taskProperties is null', () => {
+    const taskProperties = null as unknown as GridSupportedTaskProperties
+    expect(() => getCreateGridRequestForMetadataTask(taskProperties)).toThrow(
+      'taskProperties is required',
+    )
   })
 
-  it('returns correct CreateGridRequest for RecordBasedMetadataTaskProperties', () => {
-    const props = {
-      concreteType:
-        'org.sagebionetworks.repo.model.curation.metadata.RecordBasedMetadataTaskProperties',
-      recordSetId: 'syn456',
-    } satisfies CurationTaskProperties
-    const result = getCreateGridRequestForMetadataTask(props)
-    expect(result).toEqual({
-      concreteType: 'org.sagebionetworks.repo.model.grid.CreateGridRequest',
-      recordSetId: 'syn456',
-    })
-  })
-
-  it('throws error for unknown concreteType', () => {
-    const props = {
-      concreteType: 'unknownType',
-    } as any
-    expect(() => getCreateGridRequestForMetadataTask(props)).toThrow(
+  it('throws for unknown concreteType', () => {
+    const taskProperties = { concreteType: 'unknownType' } as any
+    expect(() => getCreateGridRequestForMetadataTask(taskProperties)).toThrow(
       'Unknown taskProperties concreteType: unknownType',
     )
+  })
+
+  describe('FileBasedMetadataTaskProperties', () => {
+    it('returns correct CreateGridRequest', () => {
+      const taskProperties = {
+        concreteType: FILE_BASED,
+        fileViewId: 'syn123',
+      } as unknown as GridSupportedTaskProperties
+      expect(getCreateGridRequestForMetadataTask(taskProperties)).toEqual({
+        concreteType: GRID_REQUEST_CONCRETE_TYPE,
+        initialQuery: { sql: 'SELECT * FROM syn123' },
+        ownerPrincipalId: undefined,
+      })
+    })
+
+    describe('RecordBasedMetadataTaskProperties', () => {
+      it('returns correct CreateGridRequest', () => {
+        const taskProperties = {
+          concreteType: RECORD_BASED,
+          recordSetId: 'syn456',
+        } as unknown as GridSupportedTaskProperties
+        expect(getCreateGridRequestForMetadataTask(taskProperties)).toEqual({
+          concreteType: GRID_REQUEST_CONCRETE_TYPE,
+          recordSetId: 'syn456',
+          ownerPrincipalId: undefined,
+        })
+      })
+    })
   })
 })

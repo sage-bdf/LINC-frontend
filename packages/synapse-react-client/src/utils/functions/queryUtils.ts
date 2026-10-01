@@ -185,8 +185,8 @@ export function canTableQueryBeAddedToDownloadList<T extends Table = Table>(
 
   return Boolean(
     entityColumnId ||
-      (entity &&
-        ((isEntityView(entity) && isFileView(entity)) || isDataset(entity))),
+    (entity &&
+      ((isEntityView(entity) && isFileView(entity)) || isDataset(entity))),
   )
 }
 
@@ -261,7 +261,7 @@ export function getCorrespondingColumnForFacet(
 ): ColumnModel | JsonSubColumnModel | undefined {
   let columnModel: ColumnModel | JsonSubColumnModel | undefined =
     columnModels.find(model => model.name === facet.columnName)
-  if (facet.jsonPath && columnModel && columnModel.jsonSubColumns) {
+  if (facet.jsonPath && columnModel?.jsonSubColumns) {
     columnModel = columnModel.jsonSubColumns.find(
       cm => cm.jsonPath === facet.jsonPath,
     )

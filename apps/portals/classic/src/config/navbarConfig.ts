@@ -15,6 +15,7 @@ export const navbarConfig: NavbarConfig = {
           path: '/Explore/Studies',
         },
         { name: 'Publications', path: '/Explore/Publications' },
+        { name: 'Metadata', path: '/Explore/Metadata' },
       ],
     },
     {
@@ -23,7 +24,7 @@ export const navbarConfig: NavbarConfig = {
     },
     {
       name: 'News',
-      path: 'https://sclasportnews.wpenginepowered.com/',
+      path: 'https://sites.google.com/ncsu.edu/classic/news',
     },
     {
       name: 'Help',

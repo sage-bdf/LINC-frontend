@@ -1,6 +1,5 @@
 import {
   createTextColumn,
-  floatColumn,
   keyColumn,
 } from '@sage-bionetworks/react-datasheet-grid'
 import { autocompleteColumn } from '../columns/AutocompleteColumn'
@@ -8,6 +7,7 @@ import { mocked } from 'storybook/test'
 import { describe, expect, it } from 'vitest'
 import { autocompleteMultipleEnumColumn } from '../columns/AutocompleteMultipleEnumColumn'
 import { dateTimeColumn } from '../columns/DateTimeColumn'
+import { numberColumn } from '../columns/NumberColumn'
 import { createColumn } from './columnFactory'
 import React, { isValidElement, ReactElement } from 'react'
 
@@ -16,9 +16,10 @@ vi.mock('../components/ColumnHeaderWithTooltip', () => ({
 }))
 
 vi.mock('@sage-bionetworks/react-datasheet-grid', async importActual => {
-  const actual = await importActual<
-    typeof import('@sage-bionetworks/react-datasheet-grid')
-  >()
+  const actual =
+    await importActual<
+      typeof import('@sage-bionetworks/react-datasheet-grid')
+    >()
   return {
     ...actual,
     keyColumn: vi.fn().mockImplementation(actual.keyColumn),
@@ -36,6 +37,10 @@ vi.mock('../columns/DateTimeColumn', () => ({
 
 vi.mock('../columns/AutocompleteMultipleEnumColumn', () => ({
   autocompleteMultipleEnumColumn: vi.fn(),
+}))
+
+vi.mock('../columns/NumberColumn', () => ({
+  numberColumn: vi.fn(),
 }))
 
 /** Helper to extract props from ColumnHeaderWithTooltip React element */
@@ -85,6 +90,7 @@ const mockAutocompleteMultipleEnumColumn = mocked(
   autocompleteMultipleEnumColumn,
 ).mockReturnValue(fakeColumn)
 const mockDateTimeColumn = mocked(dateTimeColumn).mockReturnValue(fakeColumn)
+const mockNumberColumn = mocked(numberColumn).mockReturnValue(fakeColumn)
 
 describe('columnFactory', () => {
   beforeEach(() => {
@@ -109,7 +115,6 @@ describe('columnFactory', () => {
       const headerProps = getHeaderProps(column.title)
       expect(headerProps.name).toBe('tags')
       expect(headerProps.description).toBeUndefined()
-      expect(column.headerClassName).toBe('header-cell-required')
     })
 
     it('should create a boolean column for boolean type', () => {
@@ -126,7 +131,6 @@ describe('columnFactory', () => {
       const headerProps = getHeaderProps(column.title)
       expect(headerProps.name).toBe('isActive')
       expect(headerProps.description).toBeUndefined()
-      expect(column.headerClassName).toBe('header-cell')
     })
 
     it('should create a date-time column for string type and date-time format', () => {
@@ -138,13 +142,38 @@ describe('columnFactory', () => {
       }
 
       const column = createColumn(config)
-      expect(mockDateTimeColumn).toHaveBeenCalled()
+      expect(mockDateTimeColumn).toHaveBeenCalledWith({
+        colType: 'string',
+        format: 'date-time',
+      })
 
       const headerProps = getHeaderProps(column.title)
       expect(headerProps.name).toBe('isActive')
       expect(headerProps.description).toBeUndefined()
-      expect(column.headerClassName).toBe('header-cell')
     })
+
+    // The date column reads and writes a calendar date instead of an instant when
+    // the format is `date`, so the format has to reach it.
+    it.each(['string', 'integer'])(
+      'should create a date column for %s type and date format',
+      colType => {
+        const config = {
+          columnName: 'dueDate',
+          typeInfo: { type: colType, format: 'date', isArray: false },
+          enumeratedValues: [],
+          isRequired: false,
+        }
+
+        createColumn(config)
+
+        expect(mockDateTimeColumn).toHaveBeenCalledWith({
+          colType,
+          format: 'date',
+        })
+        expect(mockNumberColumn).not.toHaveBeenCalled()
+        expect(mockCreateTextColumn).not.toHaveBeenCalled()
+      },
+    )
 
     it('should create a number column for number type', () => {
       const config = {
@@ -155,12 +184,15 @@ describe('columnFactory', () => {
       }
 
       const column = createColumn(config)
-      expect(keyColumnSpy).toHaveBeenCalledWith('count', floatColumn)
+      expect(mockNumberColumn).toHaveBeenCalledWith({
+        colType: 'number',
+        isRequired: true,
+      })
+      expect(keyColumnSpy).toHaveBeenCalledWith('count', fakeColumn)
 
       const headerProps = getHeaderProps(column.title)
       expect(headerProps.name).toBe('count')
       expect(headerProps.description).toBeUndefined()
-      expect(column.headerClassName).toBe('header-cell-required')
     })
 
     it('should create a number column for integer type', () => {
@@ -172,11 +204,14 @@ describe('columnFactory', () => {
       }
 
       const column = createColumn(config)
+      expect(mockNumberColumn).toHaveBeenCalledWith({
+        colType: 'integer',
+        isRequired: false,
+      })
 
       const headerProps = getHeaderProps(column.title)
       expect(headerProps.name).toBe('age')
       expect(headerProps.description).toBeUndefined()
-      expect(column.headerClassName).toBe('header-cell')
     })
 
     it('should create an enumerated column when enumeratedValues are provided', () => {
@@ -193,7 +228,6 @@ describe('columnFactory', () => {
       const headerProps = getHeaderProps(column.title)
       expect(headerProps.name).toBe('status')
       expect(headerProps.description).toBeUndefined()
-      expect(column.headerClassName).toBe('header-cell-required')
     })
 
     it('should create a text column as default', () => {
@@ -210,33 +244,6 @@ describe('columnFactory', () => {
       const headerProps = getHeaderProps(column.title)
       expect(headerProps.name).toBe('description')
       expect(headerProps.description).toBeUndefined()
-      expect(column.headerClassName).toBe('header-cell')
-    })
-
-    it('should set required header class when isRequired is true', () => {
-      const config = {
-        columnName: 'name',
-        typeInfo: { type: 'string', isArray: false },
-        enumeratedValues: [],
-        isRequired: true,
-      }
-
-      const column = createColumn(config)
-
-      expect(column.headerClassName).toBe('header-cell-required')
-    })
-
-    it('should set normal header class when isRequired is false', () => {
-      const config = {
-        columnName: 'name',
-        typeInfo: { type: 'string', isArray: false },
-        enumeratedValues: [],
-        isRequired: false,
-      }
-
-      const column = createColumn(config)
-
-      expect(column.headerClassName).toBe('header-cell')
     })
 
     describe('Custom Width Support', () => {
@@ -285,6 +292,20 @@ describe('columnFactory', () => {
 
         expect(column.minWidth).toBeGreaterThanOrEqual(DATETIME_MIN_WIDTH)
         expect(column.basis).toBeGreaterThanOrEqual(DATETIME_MIN_WIDTH)
+      })
+
+      it('should not reserve time-of-day width for date-only columns', () => {
+        const config = {
+          columnName: 'dt',
+          typeInfo: { type: 'string', format: 'date', isArray: false },
+          enumeratedValues: [],
+          isRequired: false,
+        }
+
+        const column = createColumn(config)
+
+        expect(column.minWidth).toBe(DEFAULT_MIN_WIDTH)
+        expect(column.basis).toBe(DEFAULT_MIN_WIDTH)
       })
     })
 
@@ -402,7 +423,6 @@ describe('columnFactory', () => {
         expect(column.basis).toBe(180)
         expect(column.grow).toBe(0)
         expect(column.shrink).toBe(0)
-        expect(column.headerClassName).toBe('header-cell-required')
       })
     })
 

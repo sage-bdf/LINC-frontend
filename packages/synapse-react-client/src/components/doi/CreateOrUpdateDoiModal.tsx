@@ -187,6 +187,9 @@ export function CreateOrUpdateDoiModal(props: CreateOrUpdateDoiModalProps) {
   )
 
   const shouldShowWarning = useMemo(() => {
+    if (objectType !== DoiObjectType.ENTITY) {
+      return false
+    }
     return (
       open &&
       doi === null && // Creating new DOI
@@ -197,7 +200,7 @@ export function CreateOrUpdateDoiModal(props: CreateOrUpdateDoiModalProps) {
         realmPrincipals,
       )
     )
-  }, [open, doi, entityBundle, realmPrincipals])
+  }, [open, doi, entityBundle, realmPrincipals, objectType])
 
   useEffect(() => {
     if (
@@ -290,7 +293,7 @@ export function CreateOrUpdateDoiModal(props: CreateOrUpdateDoiModalProps) {
   }, [currentUser, doi, entityBundle])
 
   function onSave() {
-    if (formRef.current && formRef.current.validateForm()) {
+    if (formRef.current?.validateForm()) {
       const requestDoi: V2Doi = convertFormDataToDoi(formData)
       requestDoi.objectType = objectType
       requestDoi.objectId = objectId
@@ -338,7 +341,7 @@ export function CreateOrUpdateDoiModal(props: CreateOrUpdateDoiModalProps) {
       {doiCanBeAppliedToVersion && (
         <StyledFormControl className="limit-type" fullWidth sx={{ my: 2 }}>
           <InputLabel
-            htmlFor="doi-version-select"
+            id="doi-version-select"
             sx={{
               display: 'flex',
               alignItems: 'center',
@@ -355,7 +358,7 @@ export function CreateOrUpdateDoiModal(props: CreateOrUpdateDoiModalProps) {
             </MarkdownPopover>
           </InputLabel>
           <Select
-            id="doi-version-select"
+            labelId="doi-version-select"
             value={selectedVersionNumber ?? -1}
             onChange={e => {
               if (e.target.value === -1) {
@@ -383,19 +386,17 @@ export function CreateOrUpdateDoiModal(props: CreateOrUpdateDoiModalProps) {
           </Select>
         </StyledFormControl>
       )}
-      <div className="JsonSchemaFormContainer">
-        <JsonSchemaForm
-          formRef={formRef}
-          disabled={isLoading || wasModifiedViaAPI}
-          schema={doiFormSchema}
-          formData={formData}
-          onChange={e => {
-            setFormData(e.formData)
-          }}
-          uiSchema={doiFormUiSchema}
-          showErrorList={false}
-        />
-      </div>
+      <JsonSchemaForm
+        formRef={formRef}
+        disabled={isLoading || wasModifiedViaAPI}
+        schema={doiFormSchema}
+        formData={formData}
+        onChange={e => {
+          setFormData(e.formData)
+        }}
+        uiSchema={doiFormUiSchema}
+        showErrorList={false}
+      />
       {doi && (
         <Alert severity={'warning'}>
           <Typography variant={'body1'}>

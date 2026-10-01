@@ -52,7 +52,7 @@ const patchRequestFacets = (
   const isEmptyValuesFacet =
     changedFacet.concreteType ===
       'org.sagebionetworks.repo.model.table.FacetColumnValuesRequest' &&
-    (!changedFacet.facetValues || !changedFacet.facetValues.length)
+    !changedFacet.facetValues?.length
   const isEmptyRangesFacet =
     changedFacet.concreteType ===
       'org.sagebionetworks.repo.model.table.FacetColumnRangeRequest' &&
@@ -199,7 +199,7 @@ function FacetFilterControls(props: FacetFilterControlsProps) {
     [facetColumnsShown],
   )
   const combinedRangeFacetsColumnModelType = combineRangeFacetConfig
-    ? columnModels!.find(
+    ? columnModels?.find(
         model => model.name === combineRangeFacetConfig.minFacetColumn,
       )?.columnType
     : undefined
@@ -247,7 +247,10 @@ function FacetFilterControls(props: FacetFilterControlsProps) {
         />
       )}
       {shownTopLevelFacets.map(facet => {
-        const columnModel = getCorrespondingColumnForFacet(facet, columnModels!)
+        const columnModel = getCorrespondingColumnForFacet(
+          facet,
+          columnModels ?? [],
+        )
         return (
           <div className="FacetFilterControls__facet" key={facet.columnName}>
             {facet.facetType === 'enumeration' && columnModel && (

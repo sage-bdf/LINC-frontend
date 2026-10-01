@@ -1,14 +1,12 @@
-import tools from '@/config/synapseConfigs/tools'
+import { portalMetadata } from '@/config/portalMetadata'
+import { toolsSearch } from '@/config/synapseConfigs/tools'
 import { createStaticMeta } from '@sage-bionetworks/synapse-portal-framework/utils/detailPageRouteUtils'
-import QueryWrapperPlotNav from 'synapse-react-client/components/QueryWrapperPlotNav/QueryWrapperPlotNav'
+import SearchQueryWrapperPlotNav from 'synapse-react-client/components/SearchQueryWrapperPlotNav/SearchQueryWrapperPlotNav'
 
-export const meta = createStaticMeta(
-  'Explore Tools',
-  import.meta.env.VITE_PORTAL_NAME,
-)
+export const meta = createStaticMeta({ title: 'Explore Tools' }, portalMetadata)
 
 function ExploreTools() {
-  return <QueryWrapperPlotNav {...tools} />
+  return <SearchQueryWrapperPlotNav {...toolsSearch} shouldDeepLink={true} />
 }
 
 export default ExploreTools

@@ -32,6 +32,7 @@ const exploreConfig: ExploreConfig = {
   arkportal: {
     table: ['Datasets', 'All Data'],
     cards: ['Programs', 'Projects', 'Collections'],
+    // cards_charts: ['Publications'],
   },
   bsmn: {
     cards_charts: ['Projects', 'Data', 'Tools', 'Publications'],
@@ -74,6 +75,7 @@ const exploreConfig: ExploreConfig = {
     // TODO: uncomment after route is finalized and source tables are OPEN_DATA
     // cards: ['Publications', 'Contributors', 'External Resources'],
   },
+  namhub: {},
 }
 
 export default exploreConfig

@@ -41,6 +41,38 @@ import { useTableSort } from './useTableSort'
 
 const DEFAULT_CUSTOM_COLUMNS: ColumnDef<Row, any>[] = []
 
+/**
+ * Returns the minimum column width (in px) for a Synapse table column
+ * based on its type and name.
+ */
+export function getColumnMinSize(
+  columnName: string,
+  columnType: ColumnTypeEnum,
+): number {
+  const nameLower = columnName.toLowerCase()
+  if (nameLower.includes('name') || nameLower.includes('description')) {
+    return 250
+  }
+  switch (columnType) {
+    case ColumnTypeEnum.ENTITYID:
+    case ColumnTypeEnum.ENTITYID_LIST:
+    case ColumnTypeEnum.USERID:
+    case ColumnTypeEnum.USERID_LIST:
+    case ColumnTypeEnum.FILEHANDLEID:
+    case ColumnTypeEnum.EVALUATIONID:
+    case ColumnTypeEnum.SUBMISSIONID:
+      return 180
+    case ColumnTypeEnum.DATE:
+    case ColumnTypeEnum.DATE_LIST:
+      return 120
+    case ColumnTypeEnum.STRING:
+    case ColumnTypeEnum.STRING_LIST:
+      return 100
+    default:
+      return 60
+  }
+}
+
 export type SynapseTableConfiguration = Pick<
   SynapseTableProps,
   | 'showAccessColumn'
@@ -135,9 +167,9 @@ export function SynapseTable(props: SynapseTableProps) {
 
   const isShowingAccessColumn: boolean = Boolean(
     showAccessColumn &&
-      entity &&
-      ((isEntityViewOrDatasetOrCollection(entity) && allRowsHaveId(rowSet)) ||
-        fileIdColumnName),
+    entity &&
+    ((isEntityViewOrDatasetOrCollection(entity) && allRowsHaveId(rowSet)) ||
+      fileIdColumnName),
   )
   const rowsAreDownloadable =
     entity &&
@@ -150,8 +182,8 @@ export function SynapseTable(props: SynapseTableProps) {
 
   const isShowingAddToV2DownloadListColumn: boolean = Boolean(
     rowsAreDownloadable &&
-      !hideAddToDownloadListColumn &&
-      !isRowSelectionVisible,
+    !hideAddToDownloadListColumn &&
+    !isRowSelectionVisible,
   )
   const rowEntityIDColumnIndex = fileIdColumnName
     ? rowSet.headers.findIndex(col => col.name == fileIdColumnName)
@@ -175,6 +207,10 @@ export function SynapseTable(props: SynapseTableProps) {
           id: selectColumn.name,
           enableSorting: isSortableColumn(selectColumn.columnType),
           enableResizing: true,
+          minSize: getColumnMinSize(
+            selectColumn.name,
+            selectColumn.columnType as ColumnTypeEnum,
+          ),
           header: TableDataColumnHeader,
           cell: TableDataCell,
         })
@@ -217,6 +253,7 @@ export function SynapseTable(props: SynapseTableProps) {
   const table = useReactTable({
     data: rowSet.rows,
     columns,
+    defaultColumn: { minSize: 60 },
     getCoreRowModel: getCoreRowModel(),
     manualSorting: true,
     manualFiltering: true,
@@ -239,8 +276,8 @@ export function SynapseTable(props: SynapseTableProps) {
         )
         return Boolean(
           selectColumn &&
-            /* JSON handles its own overflow*/
-            selectColumn.columnType !== ColumnTypeEnum.JSON,
+          /* JSON handles its own overflow*/
+          selectColumn.columnType !== ColumnTypeEnum.JSON,
         )
       },
     },
@@ -281,6 +318,7 @@ export function SynapseTable(props: SynapseTableProps) {
           table={table}
           fullWidth={false}
           autoColumnSizing={true}
+          showTopScrollbar={true}
         />
       </div>
     </SynapseTableContext.Provider>

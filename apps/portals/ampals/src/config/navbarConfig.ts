@@ -20,7 +20,6 @@ export const navbarConfig: NavbarConfig = {
       name: 'Explore',
       path: '/Explore',
       children: [
-        { name: 'Programs', path: '/Explore/Programs' },
         { name: 'Collections', path: '/Explore/Collections' },
         { name: 'Datasets', path: '/Explore/Datasets' },
         {
@@ -58,6 +57,16 @@ export const navbarConfig: NavbarConfig = {
     {
       name: 'Data Access',
       path: '/Data Access',
+      children: [
+        {
+          name: 'Data Access Overview',
+          path: '/Data Access/Data Access Overview',
+        },
+        {
+          name: 'Approved Access Requests',
+          path: '/Data Access/Approved Access Requests',
+        },
+      ],
     },
     {
       name: 'Contribute Data',

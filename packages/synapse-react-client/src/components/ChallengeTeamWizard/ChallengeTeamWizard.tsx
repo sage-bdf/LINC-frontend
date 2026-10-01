@@ -39,7 +39,7 @@ enum ChallengeTeamWizardStep {
 function getStepDialogTitle(step: ChallengeTeamWizardStep) {
   switch (step) {
     case ChallengeTeamWizardStep.SELECT_YOUR_CHALLENGE_TEAM:
-      return 'Select Your Challenge Team'
+      return 'Select Your Submission Team'
     case ChallengeTeamWizardStep.ACCEPT_INVITATION:
       return 'Invitation to Join Team'
     case ChallengeTeamWizardStep.JOIN_REQUEST_FORM:
@@ -200,37 +200,25 @@ function ChallengeTeamWizard(props: ChallengeTeamWizardProps) {
         let disableJoiningSelectedTeam = false
         let buttonOnClickBehavior: () => void = noop
         let buttonTooltip = ''
-        if (
-          selectedTeamMembershipStatus &&
-          selectedTeamMembershipStatus.hasOpenInvitation
-        ) {
+        if (selectedTeamMembershipStatus?.hasOpenInvitation) {
           // The user has been invited to join the selected team
           buttonText = 'View Invitation to Join Team'
           buttonOnClickBehavior = () => {
             setStep(ChallengeTeamWizardStep.ACCEPT_INVITATION)
           }
-        } else if (
-          selectedTeamMembershipStatus &&
-          selectedTeamMembershipStatus.hasOpenRequest
-        ) {
+        } else if (selectedTeamMembershipStatus?.hasOpenRequest) {
           // User already has an open request to join the selected team, disable button to avoid request spamming
           buttonText = 'Join Request Pending'
           disableJoiningSelectedTeam = true
           buttonTooltip =
             'You have already submitted a request to join this team.'
-        } else if (
-          selectedTeamMembershipStatus &&
-          selectedTeamMembershipStatus.membershipApprovalRequired
-        ) {
+        } else if (selectedTeamMembershipStatus?.membershipApprovalRequired) {
           // The user has to send a request to join the selected team
           buttonText = 'Request to Join Team'
           buttonOnClickBehavior = () => {
             setStep(ChallengeTeamWizardStep.JOIN_REQUEST_FORM)
           }
-        } else if (
-          selectedTeamMembershipStatus &&
-          selectedTeamMembershipStatus.canJoin
-        ) {
+        } else if (selectedTeamMembershipStatus?.canJoin) {
           // The user can freely join the selected team
           buttonText = 'Join Team'
           buttonOnClickBehavior = () => {
@@ -403,7 +391,9 @@ function ChallengeTeamWizard(props: ChallengeTeamWizardProps) {
       onCancel={hide}
       open={isShowingModal}
       actions={actions}
-      title={getStepDialogTitle(step)}
+      title={`Challenge Registration (Step 2 of 2): ${getStepDialogTitle(
+        step,
+      )}`}
       content={
         <SynapseErrorBoundary>
           <Box

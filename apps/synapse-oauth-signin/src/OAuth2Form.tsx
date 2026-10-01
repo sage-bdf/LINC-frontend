@@ -25,10 +25,10 @@ import * as SynapseQueries from 'synapse-react-client/synapse-queries/index'
 import { UserCard } from 'synapse-react-client/components/UserCard/UserCard'
 import { useSynapseContext } from 'synapse-react-client/utils/context/SynapseContext'
 import { sendAnalyticsEvent } from 'synapse-react-client/utils/analytics/sendAnalyticsEvent'
-import UniversalCookies from 'universal-cookie'
 import { OAuthClientError } from './OAuthClientError'
 import { StyledInnerContainer } from './StyledInnerContainer'
 import { handleErrorRedirect } from './URLUtils'
+import { useCookieValue } from '@react-hookz/web/useCookieValue/index.js'
 
 const sendGTagEvent = (event: string) => {
   sendAnalyticsEvent(event, { event_category: 'SynapseOAUTH' })
@@ -181,10 +181,22 @@ export function OAuth2Form() {
       },
     )
 
+  const [
+    _promptedForLoginCookie,
+    _setPromptedForLoginCookie,
+    removePromptedForLoginCookie,
+  ] = useCookieValue(
+    SynapseConstants.ACCOUNT_SITE_PROMPTED_FOR_LOGIN_COOKIE_KEY,
+    {
+      path: '/',
+      domain: AppUtils.getCookieDomain(),
+    },
+  )
+
   const { mutate: consentToRequest } = SynapseQueries.useConsentToOAuth2Request(
     {
       onSuccess: accessCode => {
-        if (!accessCode || !accessCode.access_code) {
+        if (!accessCode?.access_code) {
           onError(
             new Error(
               'Something went wrong - the access code is missing from the Synapse call.',
@@ -194,13 +206,7 @@ export function OAuth2Form() {
         }
         // done!  redirect with access code.
         const redirectUri = searchParams.get('redirect_uri')!
-        new UniversalCookies().remove(
-          SynapseConstants.ACCOUNT_SITE_PROMPTED_FOR_LOGIN_COOKIE_KEY,
-          {
-            path: '/',
-            domain: AppUtils.getCookieDomain(),
-          },
-        )
+        removePromptedForLoginCookie()
 
         const redirectSearchParams = new URLSearchParams()
         redirectSearchParams.set('code', accessCode.access_code)
@@ -333,8 +339,7 @@ export function OAuth2Form() {
     !isLoading &&
     !error &&
     !isAuthenticated &&
-    oauthClientInfo &&
-    oauthClientInfo.verified &&
+    oauthClientInfo?.verified &&
     pendingRedirectURL === undefined &&
     oidcRequestDescription &&
     hasInitializedSession // wait for session to be initialized (may be anonymous) before jumping to One Sage

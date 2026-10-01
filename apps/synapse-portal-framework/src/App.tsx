@@ -6,12 +6,18 @@ import { SynapseToastContainer } from 'synapse-react-client/components/ToastMess
 import { SynapsePortalChatDialog } from 'synapse-react-client/components/SynapseChat/SynapsePortalChatDialog'
 import AppInitializer from './components/AppInitializer'
 import { AridhiaIntegration } from './components/AridhiaIntegration'
-import { ChatDialogContext } from './components/ChatDialogContext'
+import { ChatDialogContextProvider } from './components/ChatDialogContext'
 import Footer from './components/Footer'
 import Navbar from './components/navbar/Navbar'
 import { usePortalContext } from './components/PortalContext'
 import { processResponseDocument } from './shared-config/synapseChatHelpers'
 import { useDocumentTitleFromRoutes } from './utils/useDocumentTitleFromRoutes'
+import { useTheme } from '@mui/material'
+import CurieChatDialogLauncher from './components/curie-chat-widget/CurieChatWidget'
+import {
+  ChatDialogVariant,
+  OpenChatOptions,
+} from './components/ChatDialogContext'
 
 export type AppProps = PropsWithChildren<{
   /** The default realm ID to use for the application */
@@ -23,16 +29,24 @@ export type AppProps = PropsWithChildren<{
 export default function App(props: AppProps) {
   const { defaultRealmId, requireAuthentication } = props
   useDocumentTitleFromRoutes()
-  const { aridhiaConfig, synapseChatProps } = usePortalContext()
+  const { palette } = useTheme()
+  const { aridhiaConfig, synapseChatProps, navbarConfig } = usePortalContext()
   const navigate = useNavigate()
   const [chatOpen, setChatOpen] = useState(false)
   const [chatInitialMessage, setChatInitialMessage] = useState<
     string | undefined
   >(undefined)
-  const openChat = useCallback((initialMessage: string) => {
-    setChatInitialMessage(initialMessage)
-    setChatOpen(true)
-  }, [])
+  const [chatVariant, setChatVariant] = useState<ChatDialogVariant>('default')
+  const openChat = useCallback(
+    (initialMessage: string, options?: OpenChatOptions) => {
+      setChatInitialMessage(initialMessage)
+      setChatVariant(options?.variant ?? 'default')
+      setChatOpen(true)
+    },
+    [],
+  )
+
+  const NavbarToRender = navbarConfig.NavbarComponent ?? Navbar
 
   // Create onChatResponse handler that processes XML-based navigation directives
   // in the AI response. Defined here so it captures navigate from the Router context.
@@ -48,25 +62,30 @@ export default function App(props: AppProps) {
   }, [navigate, synapseChatProps])
 
   const content = (
-    <ChatDialogContext.Provider value={{ openChat }}>
+    <ChatDialogContextProvider
+      value={{ openChat, isChatAvailable: !!synapseChatProps }}
+    >
+      <meta name="theme-color" content={palette.primary.main} />
       <SynapseToastContainer />
-      <Navbar />
+      <NavbarToRender />
       <CookiesNotification />
       <main className="main">
         {props.children}
         <Outlet />
       </main>
+      <CurieChatDialogLauncher />
       <Footer />
       {synapseChatProps && (
         <SynapsePortalChatDialog
           open={chatOpen}
+          variant={chatVariant}
           onClose={() => setChatOpen(false)}
           initialMessage={chatInitialMessage}
           onChatResponse={onChatResponse}
           {...synapseChatProps}
         />
       )}
-    </ChatDialogContext.Provider>
+    </ChatDialogContextProvider>
   )
 
   return (
@@ -76,7 +95,10 @@ export default function App(props: AppProps) {
         requireAuthentication={requireAuthentication}
       >
         {aridhiaConfig?.apiBasePath ? (
-          <AridhiaIntegration apiBasePath={aridhiaConfig.apiBasePath}>
+          <AridhiaIntegration
+            apiBasePath={aridhiaConfig.apiBasePath}
+            subjectTokenIssuer={aridhiaConfig.subjectTokenIssuer}
+          >
             {content}
           </AridhiaIntegration>
         ) : (

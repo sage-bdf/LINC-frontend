@@ -4,8 +4,10 @@ export const metricsSql = `SELECT * FROM syn70365471`
 export const featuredTeamSql = `SELECT * FROM syn70780975`
 export const getInvolvedSql = `SELECT * FROM syn71103115`
 export const newsSql = `SELECT * FROM syn71103117`
-export const allChallengesSql = `SELECT * FROM syn71324868`
+export const allChallengesSql = `SELECT * FROM syn71324868 order by status desc, title asc`
 export const homeNewChallengesSql = `SELECT * FROM syn71324868 WHERE landingPageSection HAS('new')`
 export const homeAllChallengesSql = `SELECT * FROM syn71324868 WHERE landingPageSection HAS('all')`
 export const homePopularChallengesSql = `SELECT * FROM syn71324868 WHERE landingPageSection HAS('popular')`
 export const homeOpenChallengesSql = `SELECT * FROM syn71324868 WHERE landingPageSection HAS('external')`
+
+export const allChallengesSearchIndexId = 'syn75465136'

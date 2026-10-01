@@ -5,6 +5,7 @@ import {
   LOGIN_METHOD_EMAIL,
   LOGIN_METHOD_OAUTH2_ARCUS,
   LOGIN_METHOD_OAUTH2_GOOGLE,
+  LOGIN_METHOD_OAUTH2_NIH_RESEARCHER_AUTH_SERVICE,
   LOGIN_METHOD_OAUTH2_ORCID,
   LOGIN_METHOD_OAUTH2_SAGE_BIONETWORKS,
   OAUTH2_PROVIDERS,
@@ -12,10 +13,11 @@ import {
 import { Box } from '@mui/material'
 import { MouseEvent } from 'react'
 import LoginMethodButton from './LoginMethodButton'
-import { useGetFeatureFlag } from '@/synapse-queries/featureflags/useGetFeatureFlag'
-import { FeatureFlagEnum } from '@sage-bionetworks/synapse-types'
 import { Realm } from '@sage-bionetworks/synapse-client'
-import { hasArcusProvider } from '@/utils/functions/RealmUtils'
+import {
+  hasArcusProvider,
+  hasSageBionetworksProvider,
+} from '@/utils/functions/RealmUtils'
 
 type AuthenticationMethodSelectionProps = {
   ssoRedirectUrl?: string
@@ -24,6 +26,7 @@ type AuthenticationMethodSelectionProps = {
   onSelectUsernameAndPassword: () => void
   state?: OAuth2State
   realm?: Realm
+  showRASLogin?: boolean
 }
 
 const csrfToken = generateCsrfToken()
@@ -42,13 +45,14 @@ export default function AuthenticationMethodSelection(
     onSelectUsernameAndPassword,
     state,
     realm,
+    showRASLogin,
   } = props
 
   const showArcusSSOButtonOnly = hasArcusProvider(realm)
-  const showSageBionetworksIdp = useGetFeatureFlag(
-    FeatureFlagEnum.SAGE_BIONETWORKS_IDP,
-  )
+  const showSageBionetworksSSOButtonOnly = hasSageBionetworksProvider(realm)
 
+  const isSingleIdpOnly =
+    showArcusSSOButtonOnly || showSageBionetworksSSOButtonOnly
   const stateWithCSRF: OAuth2State = { ...state, csrfToken }
 
   function onSSOSignIn(event: MouseEvent<HTMLButtonElement>, provider: string) {
@@ -72,7 +76,7 @@ export default function AuthenticationMethodSelection(
 
   return (
     <Box>
-      {!showArcusSSOButtonOnly && (
+      {!isSingleIdpOnly && (
         <>
           <LoginMethodButton
             loginMethod={LOGIN_METHOD_OAUTH2_GOOGLE}
@@ -88,19 +92,20 @@ export default function AuthenticationMethodSelection(
               onSSOSignIn(event, OAUTH2_PROVIDERS.ORCID)
             }}
           />
+          {showRASLogin && (
+            <LoginMethodButton
+              loginMethod={LOGIN_METHOD_OAUTH2_NIH_RESEARCHER_AUTH_SERVICE}
+              iconName="nih"
+              onClick={event => {
+                onSSOSignIn(event, OAUTH2_PROVIDERS.NIH_RESEARCHER_AUTH_SERVICE)
+              }}
+            />
+          )}
           <LoginMethodButton
             loginMethod={LOGIN_METHOD_EMAIL}
             iconName="email"
             onClick={onSelectUsernameAndPassword}
           />
-          {showSageBionetworksIdp && (
-            <LoginMethodButton
-              loginMethod={LOGIN_METHOD_OAUTH2_SAGE_BIONETWORKS}
-              onClick={event => {
-                onSSOSignIn(event, OAUTH2_PROVIDERS.SAGE_BIONETWORKS)
-              }}
-            />
-          )}
         </>
       )}
       {showArcusSSOButtonOnly && (
@@ -109,6 +114,14 @@ export default function AuthenticationMethodSelection(
           // iconName="arcusbio"
           onClick={event => {
             onSSOSignIn(event, OAUTH2_PROVIDERS.ARCUS)
+          }}
+        />
+      )}
+      {showSageBionetworksSSOButtonOnly && (
+        <LoginMethodButton
+          loginMethod={LOGIN_METHOD_OAUTH2_SAGE_BIONETWORKS}
+          onClick={event => {
+            onSSOSignIn(event, OAUTH2_PROVIDERS.SAGE_BIONETWORKS)
           }}
         />
       )}

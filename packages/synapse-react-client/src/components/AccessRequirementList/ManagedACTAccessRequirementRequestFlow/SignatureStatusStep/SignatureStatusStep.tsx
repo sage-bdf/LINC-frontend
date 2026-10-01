@@ -1,0 +1,396 @@
+import {
+  useGetDataAccessRequestForUpdate,
+  useGetDataAccessRequestPreview,
+  useGetDataAccessRequestSignatureStatus,
+  useGetDataAccessRequestSignatureUpdatable,
+  useGetDataAccessRequestSignedFileHandleId,
+  useSubmitDataAccessRequest,
+  useUpdateDataAccessRequest,
+} from '@/synapse-queries'
+import SynapseClient from '@/synapse-client'
+import { formatDate } from '@/utils/functions/DateFormatter'
+import { PRODUCTION_ENDPOINT_CONFIG } from '@/utils/functions/getEndpoint'
+import {
+  CheckCircleOutline,
+  HourglassEmpty,
+  OpenInNew,
+  Refresh,
+} from '@mui/icons-material'
+import {
+  Alert,
+  Box,
+  Button,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  Link,
+  Skeleton,
+  Stack,
+  SxProps,
+  Typography,
+} from '@mui/material'
+import {
+  EDucSignerStatus,
+  EDucSignerStatusStatusEnum,
+} from '@sage-bionetworks/synapse-client'
+import {
+  FileHandleAssociateType,
+  ManagedACTAccessRequirement,
+  RestrictableObjectType,
+} from '@sage-bionetworks/synapse-types'
+import dayjs from 'dayjs'
+import { useState } from 'react'
+import IconSvg from '../../../IconSvg/IconSvg'
+import { longFieldLabelSx } from '../styles'
+
+/** Browser defaults indent a blockquote far too much for a nested list item. */
+const declinedReasonSx: SxProps = {
+  mx: 0,
+  my: 0.5,
+  pl: 1.5,
+  borderLeft: '3px solid',
+  borderColor: 'grey.300',
+  color: 'grey.700',
+}
+
+export type SignatureStatusStepProps = {
+  managedACTAccessRequirement: ManagedACTAccessRequirement
+  subjectId: string
+  subjectType: RestrictableObjectType
+  onHide: () => void
+  /**
+   * Called when the user clicks the Back button. When omitted, the Back button is hidden —
+   * used when the step is reached via direct entry (e.g. a deep-link route) rather than
+   * through the wizard flow, so there is no meaningful previous step to return to.
+   */
+  onBackClicked?: () => void
+  onSubmissionCreated: (submissionId: string) => void
+  /**
+   * Optional href override for the "View DUC" link. When set, the preview file handle fetch
+   * is skipped and this URL is used directly. Used by stories and tests where the portal
+   * servlet is not available.
+   */
+  viewDucHrefOverride?: string
+}
+
+/**
+ * Wizard step shown after the user has routed the eDUC for electronic signature
+ * (PORTALS-4380). Polls the DocuSign envelope status, lists the pending signers,
+ * and enables submission once every signer has signed.
+ */
+export default function SignatureStatusStep(props: SignatureStatusStepProps) {
+  const {
+    managedACTAccessRequirement,
+    subjectId,
+    subjectType,
+    onHide,
+    onBackClicked,
+    onSubmissionCreated,
+    viewDucHrefOverride,
+  } = props
+
+  const { data: dataAccessRequest, isLoading: isLoadingDar } =
+    useGetDataAccessRequestForUpdate(String(managedACTAccessRequirement.id), {
+      staleTime: Infinity,
+      throwOnError: true,
+    })
+
+  const requestId = dataAccessRequest?.id ?? ''
+
+  const {
+    data: signatureStatus,
+    isLoading: isLoadingStatus,
+    isRefetching: isRefetchingStatus,
+    error: statusError,
+    refetch: refetchStatus,
+  } = useGetDataAccessRequestSignatureStatus(requestId, {
+    enabled: Boolean(requestId),
+  })
+
+  const signers: EDucSignerStatus[] = signatureStatus?.signerStatus ?? []
+  const collectedCount = signers.filter(s => s.status === 'done').length
+  const totalCount = signers.length
+  const allCollected = totalCount > 0 && collectedCount === totalCount
+  const outstandingSigners = signers.filter(s => s.status !== 'done')
+
+  // Whether going Back could still deliver edits to this envelope is the server's call -- it knows
+  // every state DocuSign will refuse to correct. Only the copy below depends on it, so a stale or
+  // failed answer simply withholds the guidance rather than blocking the step.
+  const { data: isEnvelopeUpdatable } =
+    useGetDataAccessRequestSignatureUpdatable(requestId, {
+      enabled: Boolean(requestId) && !allCollected,
+    })
+
+  const { data: previewFileHandle } = useGetDataAccessRequestPreview(
+    requestId,
+    { enabled: Boolean(requestId) && !viewDucHrefOverride },
+  )
+  const viewDucHref =
+    viewDucHrefOverride ??
+    (previewFileHandle?.fileHandleId && requestId
+      ? SynapseClient.getPortalFileHandleServletUrl(
+          previewFileHandle.fileHandleId,
+          requestId,
+          FileHandleAssociateType.DataAccessRequestAttachment,
+        )
+      : undefined)
+
+  const { data: signedFileHandle } = useGetDataAccessRequestSignedFileHandleId(
+    requestId,
+    { enabled: Boolean(requestId) && allCollected },
+  )
+
+  const [updateDarError, setUpdateDarError] = useState<string | undefined>()
+  const [submitDarError, setSubmitDarError] = useState<string | undefined>()
+
+  const { mutateAsync: updateDarAsync, isPending: isUpdating } =
+    useUpdateDataAccessRequest({
+      onError: e => setUpdateDarError(e.reason),
+    })
+
+  const { mutate: submit, isPending: isSubmitting } =
+    useSubmitDataAccessRequest({
+      onSuccess: submission => onSubmissionCreated(submission.submissionId),
+      onError: e => setSubmitDarError(e.reason),
+    })
+
+  const isSubmitDisabled =
+    isLoadingDar ||
+    isLoadingStatus ||
+    isRefetchingStatus ||
+    !dataAccessRequest ||
+    !allCollected ||
+    !signedFileHandle?.fileHandleId ||
+    isUpdating ||
+    isSubmitting
+
+  const handleSubmit = async () => {
+    if (!dataAccessRequest || !signedFileHandle?.fileHandleId) return
+    setUpdateDarError(undefined)
+    setSubmitDarError(undefined)
+    const updated = await updateDarAsync({
+      ...dataAccessRequest,
+      ducFileHandleId: signedFileHandle.fileHandleId,
+    }).catch(() => null)
+    if (!updated) return
+    submit({
+      request: {
+        requestId: updated.id,
+        requestEtag: updated.etag,
+        subjectId,
+        subjectType,
+      },
+      accessRequirementId: String(managedACTAccessRequirement.id),
+    })
+  }
+
+  return (
+    <>
+      <DialogTitle>
+        <Stack direction="row" sx={{ alignItems: 'center', gap: '5px' }}>
+          Request Access
+          <Box sx={{ flexGrow: 1 }} />
+          <IconButton aria-label={'Close'} onClick={onHide}>
+            <IconSvg icon={'close'} wrap={false} sx={{ color: 'grey.700' }} />
+          </IconButton>
+        </Stack>
+      </DialogTitle>
+      <DialogContent>
+        <Typography variant={'headline3'} sx={{ mb: 2 }}>
+          Sign a Data Use Certificate (DUC)
+        </Typography>
+        <Typography variant={'body1'} sx={{ ...longFieldLabelSx, mb: 2 }}>
+          Your DUC has been emailed to your Collaborators. Once all signatures
+          (including the Signing Official) have been collected, you can submit
+          the Data Access Request.
+        </Typography>
+        {/* Editing is only worth offering while signatures are still outstanding -- once every
+            signer is done the user should simply submit. Withheld until both the status and the
+            precheck resolve, so the copy neither appears and then vanishes nor promises that
+            existing signatures carry over when the server has already ruled that out. */}
+        {onBackClicked &&
+          signatureStatus &&
+          !allCollected &&
+          isEnvelopeUpdatable && (
+            <Typography variant={'body1'} sx={{ ...longFieldLabelSx, mb: 3 }}>
+              You can update the list of Collaborators by pressing{' '}
+              <strong>Back</strong>. Your changes will be applied to this
+              signature request, so anyone who has already signed will not need
+              to sign again.
+            </Typography>
+          )}
+
+        {isLoadingStatus && (
+          <Skeleton
+            variant={'rectangular'}
+            width={'100%'}
+            height={120}
+            data-testid={'SignatureStatusStep-loading'}
+          />
+        )}
+
+        {statusError && (
+          <Alert severity={'error'}>
+            <strong>
+              Sorry, we couldn&apos;t load the current signature status.
+            </strong>
+            <br />
+            {statusError.reason}
+          </Alert>
+        )}
+
+        {!isLoadingStatus && !statusError && signatureStatus && (
+          <>
+            <Stack
+              direction={'row'}
+              sx={{ alignItems: 'center', gap: 1, mb: 1 }}
+            >
+              {allCollected ? (
+                <CheckCircleOutline color={'success'} />
+              ) : (
+                <HourglassEmpty sx={{ color: 'grey.700' }} />
+              )}
+              <Typography variant={'body1'} sx={{ fontWeight: 700 }}>
+                {allCollected
+                  ? 'All signatures collected.'
+                  : `${collectedCount} out of ${totalCount} signatures collected.`}
+              </Typography>
+              <Box sx={{ flexGrow: 1 }} />
+              {viewDucHref && (
+                <Link
+                  href={viewDucHref}
+                  target={'_blank'}
+                  rel={'noopener'}
+                  sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                  }}
+                >
+                  View DUC
+                  <OpenInNew fontSize={'small'} />
+                </Link>
+              )}
+            </Stack>
+
+            {outstandingSigners.length > 0 && (
+              <>
+                <Typography variant={'body1'} sx={{ mb: 1 }}>
+                  You&apos;re still waiting for signatures from
+                </Typography>
+                <Box component={'ul'} sx={{ mt: 0, mb: 2, pl: 3 }}>
+                  {outstandingSigners.map((signer, index) => (
+                    <li key={signer.userId ?? `${signer.name}-${index}`}>
+                      <SignerLine signer={signer} />
+                    </li>
+                  ))}
+                </Box>
+              </>
+            )}
+
+            <Button
+              variant={'outlined'}
+              startIcon={<Refresh />}
+              loading={isRefetchingStatus}
+              onClick={() => {
+                refetchStatus()
+              }}
+            >
+              Refresh
+            </Button>
+          </>
+        )}
+
+        {updateDarError && (
+          <Alert severity={'error'} sx={{ mt: 2 }}>
+            <strong>Sorry, we couldn&apos;t save your change.</strong>
+            <br />
+            {updateDarError}
+          </Alert>
+        )}
+        {submitDarError && (
+          <Alert severity={'error'} sx={{ mt: 2 }}>
+            <strong>Sorry, we couldn&apos;t submit your request.</strong>
+            <br />
+            {submitDarError}
+          </Alert>
+        )}
+      </DialogContent>
+      <DialogActions>
+        {onBackClicked && (
+          <Button variant={'outlined'} onClick={onBackClicked}>
+            Back
+          </Button>
+        )}
+        <Box sx={{ flexGrow: 1 }} />
+        <Button
+          variant={'contained'}
+          disabled={isSubmitDisabled}
+          loading={isSubmitting}
+          onClick={() => {
+            handleSubmit()
+          }}
+        >
+          Submit
+        </Button>
+      </DialogActions>
+    </>
+  )
+}
+
+/**
+ * Only surface non-pending problem states inline; pending is implied by the section header. A
+ * decline carries a timestamp, which folds into the label so the row doesn't read "(declined)"
+ * and then repeat itself underneath.
+ */
+function getSignerStatusLabel(signer: EDucSignerStatus): string {
+  if (
+    !signer.status ||
+    signer.status === EDucSignerStatusStatusEnum.pending ||
+    signer.status === EDucSignerStatusStatusEnum.done
+  ) {
+    return ''
+  }
+  if (
+    signer.status === EDucSignerStatusStatusEnum.declined &&
+    signer.declinedOn
+  ) {
+    return ` (declined ${formatDate(dayjs(signer.declinedOn))})`
+  }
+  return ` (${signer.status})`
+}
+
+function SignerLine(props: { signer: EDucSignerStatus }) {
+  const { signer } = props
+  const displayName = signer.name ?? 'Unnamed signer'
+  const nameNode = signer.userId ? (
+    <Link
+      href={`${PRODUCTION_ENDPOINT_CONFIG.PORTAL}Profile:${signer.userId}`}
+      target={'_blank'}
+      rel={'noopener'}
+    >
+      {displayName}
+    </Link>
+  ) : (
+    <>{displayName}</>
+  )
+  return (
+    <>
+      <Typography variant={'body1'} component={'span'}>
+        {nameNode}
+        {getSignerStatusLabel(signer)}
+      </Typography>
+      {/* The reason is the signer's own words, so it is quoted rather than restated as UI copy. */}
+      {signer.declinedReason && (
+        <Typography
+          variant={'body1'}
+          component={'blockquote'}
+          sx={declinedReasonSx}
+        >
+          {signer.declinedReason}
+        </Typography>
+      )}
+    </>
+  )
+}

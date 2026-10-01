@@ -1,5 +1,4 @@
 [![npm version](https://badge.fury.io/js/synapse-react-client.svg)](https://badge.fury.io/js/synapse-react-client)
-[![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg?style=flat-square)](https://github.com/prettier/prettier)
 
 # LINC toolsuite monorepo
 
@@ -28,7 +27,7 @@ We're using [pnpm workspaces](https://pnpm.io/workspaces) to manage multiple pro
 │  ├── ./portals - Generates sites for data portals. Contains configurations for each maintained portal.
 │  ├── ./SageAccountWeb - Standalone client-only React application for managing a Sage Bionetworks user account
 │  └── ./synapse-oauth-signin - Standalone client-only React application used to authenticate and consent to an app that uses Synapse OAuth2+OIDC services
-├── ./projects - Libraries and utilities that may or may not be published to NPM
+├── ./packages - Libraries and utilities that may or may not be published to NPM
 │  ├── ./synapse-react-client - React components and utilities used in Synapse.org and portals
 │  ├── ./synapse-types - TypeScript definitions and utility functions for Synapse REST API objects
 │  └── ./vite-config - Shared configuration files for Vite used by apps
@@ -49,6 +48,8 @@ On the latest commit for a PR where changes will be merged to `main`, multiple j
 All changed projects and their dependents will be built, linted, tested, and type-checked.
 
 Additionally, the project Storybook(s) will be published to Chromatic, where each story will be tested and snapshotted. To reduce usage, this job only runs on pull requests that are "ready-for-review" i.e. not drafts. For this reason, please mark your pull request as a draft until these checks are necessary.
+
+The Storybook for the latest `main` is also published to GitHub Pages: https://sage-bionetworks.github.io/synapse-web-monorepo/
 
 Some notes:
 

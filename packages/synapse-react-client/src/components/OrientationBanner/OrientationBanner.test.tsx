@@ -6,11 +6,11 @@ import {
   waitForElementToBeRemoved,
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import OrientationBanner, {
+import OrientationBanner, { OrientationBannerProps } from './OrientationBanner'
+import {
   getOrientationBannerKey,
   OrientationBannerName,
-  OrientationBannerProps,
-} from './OrientationBanner'
+} from '@/utils/OrientationBannerConstants'
 
 const onPrimaryButtonClicked = vi.fn()
 window.open = vi.fn()
@@ -49,14 +49,12 @@ function setUp(
   const alert = screen.queryByRole('alert')
   const buttons = {
     primary:
-      defaultProps.primaryButtonConfig &&
-      defaultProps.primaryButtonConfig.text &&
+      defaultProps.primaryButtonConfig?.text &&
       screen.queryByRole('button', {
         name: defaultProps.primaryButtonConfig.text,
       }),
     secondary:
-      defaultProps.secondaryButtonConfig &&
-      defaultProps.secondaryButtonConfig.text &&
+      defaultProps.secondaryButtonConfig?.text &&
       screen.queryByRole('button', {
         name: defaultProps.secondaryButtonConfig.text,
       }),

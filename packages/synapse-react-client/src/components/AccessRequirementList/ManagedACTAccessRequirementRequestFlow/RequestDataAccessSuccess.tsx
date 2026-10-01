@@ -30,7 +30,7 @@ export default function RequestDataAccessSuccess(
         >
           Your Data Access Request Has Been Submitted
           <Box sx={{ flexGrow: 1 }} />
-          <IconButton onClick={onHide}>
+          <IconButton aria-label={'Close'} onClick={onHide}>
             <IconSvg icon={'close'} wrap={false} sx={{ color: 'grey.700' }} />
           </IconButton>
         </Stack>
@@ -38,7 +38,7 @@ export default function RequestDataAccessSuccess(
 
       <DialogContent>
         <Typography variant="body1">
-          Your data access request been submitted and is currently being
+          Your data access request has been submitted and is currently being
           reviewed. Please allow for up to 2 weeks for your request to be
           reviewed and approved.
         </Typography>

@@ -1,12 +1,10 @@
-import SynapseClient from '@/synapse-client'
-import { BackendDestinationEnum, getEndpoint } from '@/utils/functions'
+import { useGetStablePresignedUrl } from '@/synapse-queries/file/useFiles'
 import { calculateFriendlyFileSize } from '@/utils/functions/calculateFriendlyFileSize'
-import { Alert } from '@mui/material'
+import { Alert, Skeleton } from '@mui/material'
 import {
   FileHandle,
   FileHandleAssociation,
 } from '@sage-bionetworks/synapse-types'
-import { useRef } from 'react'
 
 export type PdfPreviewProps = {
   fileHandle: FileHandle
@@ -17,16 +15,27 @@ export const maxPdfSize = Math.pow(1024, 2) * 30 // 30MB
 const friendlyMaxPdfSize = calculateFriendlyFileSize(maxPdfSize) // 30MB
 
 /**
- * Renders raw HTML. Uses file handle data to determine if the content should be sanitized.
+ * Renders a PDF file handle in an iframe.
  * @param props
  * @returns
  */
 export default function PdfPreview(props: PdfPreviewProps) {
-  const { fileHandle, fileHandleAssociation: fha } = props
-  const frameEl = useRef(null)
+  const { fileHandle, fileHandleAssociation } = props
+
+  const exceedsMaxSize = fileHandle.contentSize > maxPdfSize
+
+  // The presigned URL is fetched into a blob rather than used as the iframe src directly: Synapse signs the URL with
+  // `response-content-disposition=attachment`, which would make the browser download the file instead of rendering it.
+  const stablePresignedUrl = useGetStablePresignedUrl(
+    fileHandleAssociation,
+    false,
+    { enabled: !exceedsMaxSize },
+  )
+  const blobUrl = stablePresignedUrl?.dataUrl
+  const blobError = stablePresignedUrl?.queryResult.error
 
   const friendlyFileSize = calculateFriendlyFileSize(fileHandle.contentSize)
-  if (fileHandle.contentSize > maxPdfSize) {
+  if (exceedsMaxSize) {
     return (
       <Alert severity="error" sx={{ marginBottom: '20px' }}>
         The PDF preview was not shown because the file size ({friendlyFileSize})
@@ -34,21 +43,20 @@ export default function PdfPreview(props: PdfPreviewProps) {
       </Alert>
     )
   }
-  const fhaUrl = SynapseClient.getPortalFileHandleServletUrl(
-    fha.fileHandleId,
-    fha.associateObjectId,
-    fha.associateObjectType,
-  )
+
+  if (blobError) {
+    return (
+      <Alert severity="error" sx={{ marginBottom: '20px' }}>
+        The PDF preview could not be loaded: {blobError.message}
+      </Alert>
+    )
+  }
+
+  if (!blobUrl) {
+    return <Skeleton variant="rectangular" width="100%" height="800px" />
+  }
+
   return (
-    <>
-      <iframe
-        ref={frameEl}
-        src={`${getEndpoint(
-          BackendDestinationEnum.PORTAL_ENDPOINT,
-        )}pdf.js/web/viewer.html?file=${encodeURIComponent(fhaUrl)}`}
-        height="800px"
-        style={{ border: 0, width: '100%' }}
-      />
-    </>
+    <iframe src={blobUrl} height="800px" style={{ border: 0, width: '100%' }} />
   )
 }

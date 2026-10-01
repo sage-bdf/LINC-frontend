@@ -2,20 +2,44 @@ import type { CardConfiguration } from 'synapse-react-client/components/CardCont
 import type { QueryWrapperPlotNavProps } from 'synapse-react-client/components/QueryWrapperPlotNav/QueryWrapperPlotNav'
 import * as SynapseConstants from 'synapse-react-client/utils/SynapseConstants'
 import { TableToGenericCardMapping } from 'synapse-react-client/components/GenericCard/TableRowGenericCard'
-import { computationalSql, defaultSearchConfiguration } from '../resources'
+import { TargetEnum } from 'synapse-react-client/utils/html/TargetEnum'
+import {
+  computationalSearchIndexId,
+  computationalSql,
+  defaultSearchConfiguration,
+} from '../resources'
+import { SearchQueryWrapperPlotNavProps } from 'synapse-react-client/components/SearchQueryWrapperPlotNav/SearchQueryWrapperPlotNav'
 
 const computationalSchema: TableToGenericCardMapping = {
   type: SynapseConstants.COMPUTATIONAL,
   title: 'name',
   description: 'summary',
   subTitle: 'softwareType',
-  secondaryLabels: ['contributor', 'project', 'toolType', 'documentation'],
-  link: 'url',
+  secondaryLabels: [
+    'toolHomepage',
+    'toolOperation',
+    'toolInputData',
+    'toolInputFormat',
+    'toolOutputData',
+    'toolOutputFormat',
+    'toolType',
+    'documentation',
+    'project',
+    'institution',
+    'contributor',
+  ],
 }
 
 export const computationalCardConfiguration: CardConfiguration = {
   type: SynapseConstants.GENERIC_CARD,
   genericCardSchema: computationalSchema,
+  titleLinkConfig: {
+    isMarkdown: false,
+    baseURL: 'Explore/Computational Tools/DetailsPage',
+    URLColumnName: 'name',
+    matchColumnName: 'name',
+    target: TargetEnum.CURRENT_WINDOW,
+  },
   labelLinkConfig: [
     {
       isMarkdown: false,
@@ -33,9 +57,21 @@ const computationalToolsQueryWrapperPlotNavProps: QueryWrapperPlotNavProps = {
   sql: computationalSql,
   cardConfiguration: computationalCardConfiguration,
   shouldDeepLink: true,
-  name: 'Computational Tools',
+  name: 'Tools',
   facetsToPlot: ['project'],
   searchConfiguration: defaultSearchConfiguration,
+}
+
+export const computationalToolsSearch: SearchQueryWrapperPlotNavProps = {
+  rgbIndex,
+  name: 'Tools',
+  shouldDeepLink: false,
+  cardConfiguration: computationalCardConfiguration,
+  facetsToPlot: ['project'],
+  searchIndexId: computationalSearchIndexId,
+  autocompleteFieldName: 'name',
+  hideTopLevelControls: false,
+  hideQueryCount: false,
 }
 
 export default computationalToolsQueryWrapperPlotNavProps

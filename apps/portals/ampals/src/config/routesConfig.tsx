@@ -28,13 +28,6 @@ const routes: RouteObject[] = [
           import('@/pages/Explore/layout').then(convertModuleToRouteObject),
         children: [
           {
-            path: 'Programs',
-            lazy: () =>
-              import('@/pages/Explore/programs').then(
-                convertModuleToRouteObject,
-              ),
-          },
-          {
             path: 'Files',
             lazy: () =>
               import('@/pages/Explore/files').then(convertModuleToRouteObject),
@@ -62,10 +55,22 @@ const routes: RouteObject[] = [
       },
       {
         path: 'Data Access',
-        lazy: () =>
-          import('@/pages/resources/ForResearchers').then(
-            convertModuleToRouteObject,
-          ),
+        children: [
+          {
+            path: 'Data Access Overview',
+            lazy: () =>
+              import('@/pages/resources/ForResearchers').then(
+                convertModuleToRouteObject,
+              ),
+          },
+          {
+            path: 'Approved Access Requests',
+            lazy: () =>
+              import('@/pages/resources/ApprovedAccessRequests').then(
+                convertModuleToRouteObject,
+              ),
+          },
+        ],
       },
       {
         path: 'Resources',

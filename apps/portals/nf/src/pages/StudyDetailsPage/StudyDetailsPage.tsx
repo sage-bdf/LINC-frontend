@@ -14,6 +14,7 @@ import { studiesSql } from '../../config/resources'
 import { columnAliases } from '../../config/synapseConfigs/commonProps'
 import {
   studyCardConfiguration,
+  studyDoiConfiguration,
   studyHeaderIconOptions,
 } from '../../config/synapseConfigs/studies'
 import {
@@ -24,13 +25,14 @@ import {
 } from '@/config/routeConstants'
 import { sharePageLinkButtonDetailPageProps } from '@sage-bionetworks/synapse-portal-framework/shared-config/SharePageLinkButtonConfig'
 import { metadataConfig } from './StudyDetailsPage.config'
+import { portalMetadata } from '@/config/portalMetadata'
 
 export { metadataConfig }
 
-const _routeExports = createDetailPageRouteExports(metadataConfig, {
-  portalName: import.meta.env.VITE_PORTAL_NAME,
-  portalKey: import.meta.env.VITE_PORTAL_KEY,
-})
+const _routeExports = createDetailPageRouteExports(
+  metadataConfig,
+  portalMetadata,
+)
 export const loader = _routeExports.loader
 export const clientLoader = _routeExports.clientLoader
 export const meta = _routeExports.meta
@@ -95,10 +97,13 @@ function StudyDetailsPage() {
       searchParams={{ studyId }}
       ContainerProps={{ maxWidth: 'xl' }}
       resourcePrimaryKey={['studyId']}
+      portalDOIConfiguration={studyDoiConfiguration}
       disableCanonicalUrl
     >
       <DetailsPageTabs tabConfig={tabConfig} />
-      <Outlet />
+      <Outlet
+        context={{ defaultTabPath: STUDY_DETAILS_PAGE_DETAILS_TAB_PATH }}
+      />
     </DetailsPage>
   )
 }

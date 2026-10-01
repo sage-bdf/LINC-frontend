@@ -141,9 +141,7 @@ function SelectRejectionReasonsForm(props: SelectRejectionReasonsFormProps) {
     )
 
   const rowsGroupedByCategory =
-    tableData &&
-    tableData.queryResult &&
-    tableData.queryResult.queryResults.rows.reduce(
+    tableData?.queryResult?.queryResults.rows.reduce(
       (acc: Record<string, Row[]>, row) => {
         const category: string = row.values[categoryIndex!]!
         acc[category] = [...(acc[category] || []), row]
@@ -286,8 +284,7 @@ export function CannedRejectionDialog(props: CannedRejectionDialogProps) {
 
   // Transform the selected rejection reasons into an object that can be easily transformed into an email
   const defaultEmailMessageObject: RejectionMessageObject | undefined =
-    data &&
-    data.queryResult &&
+    data?.queryResult &&
     selectedRowIds.reduce((messageObject: RejectionMessageObject, rowId) => {
       const row = data.queryResult!.queryResults.rows.find(
         row => row.rowId === rowId,
@@ -335,7 +332,7 @@ export function CannedRejectionDialog(props: CannedRejectionDialogProps) {
       setEmailText(defaultEmailMessage)
     }
     // Specifically fire on update to just selectedRowIds
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRowIds])
 
   // If fetching/processing the table fails, gracefully fall back to just show the email template

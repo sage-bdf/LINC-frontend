@@ -9,31 +9,24 @@ type TableInfo = {
 }
 type TableInfoMap = Record<string, Partial<TableInfo>>
 
+// Each id is a materialized view that b2ai-standards-registry's publish step
+// repoints at the latest verified snapshot of the underlying table, so the
+// portal picks up new data without a version bump here.
 const tableInfo: TableInfoMap = {
-  DST_denormalized: {
-    name: 'DST_denormalized',
-    id: 'syn65676531.87', // current version of DST_denormalized
+  DST_denormalized: { name: 'mv_DST_denormalized', id: 'syn77626802' },
+  DataSet_denormalized: { name: 'mv_DataSet_denormalized', id: 'syn77626803' },
+  DataSubstrate: { name: 'mv_DataSubstrate', id: 'syn77626804' },
+  // DataTopic: { name: 'DataTopic', id: 'syn63096835' },
+  DataTopic_denormalized: {
+    name: 'mv_DataTopic_denormalized',
+    id: 'syn77626805',
   },
-  DataSet: { name: 'DataSet', id: 'syn66330217' },
-  DataSet_denormalized: {
-    name: 'DataSet_denormalized',
-    id: 'syn68258237.4', // current version of DataSet_denormalized
-  },
-  DataSubstrate: { name: 'DataSubstrate', id: 'syn63096834' },
-  DataTopic: { name: 'DataTopic', id: 'syn63096835' },
-  // Organization: { name: 'Organization', id: 'syn63096836.31' },
   Organization_denormalized: {
-    name: 'Organization',
-    id: 'syn69693360.21', // current version of Organization_denormalized
+    name: 'mv_Organization_denormalized',
+    id: 'syn77626806',
   },
-  D4D_content: {
-    name: 'D4D_content',
-    id: 'syn68885644.8', // current version of D4D_content
-  },
-  Manifest: {
-    name: 'Manifest',
-    id: 'syn72106735', // denormalized manifest, one row per data part
-  },
+  D4D_content: { name: 'mv_D4D_content', id: 'syn77626807' },
+  Manifest: { name: 'mv_Manifest', id: 'syn77626808' }, // denormalized manifest, one row per data part
   // UseCase: { name: 'UseCase', id: 'syn63096837' }, // not using this, might in the future?
 }
 
@@ -110,8 +103,7 @@ export const manifestSql = `
     data_part_description,
     standards_and_tools_links,
     uses_data_substrates_links,
-    concerns_data_topics_doc_links,
-    concerns_data_topics_links,
+    ${MANIFEST_COLUMN_CONSTS.CONCERNS_DATA_TOPICS},
     anatomy_links
   FROM ${tableInfo.Manifest.id}
 `
@@ -124,12 +116,13 @@ export const DATASET_DENORMALIZED_COLUMN_CONSTS: ColumnConsts = {
   DESCRIPTION: 'description',
   CATEGORY: 'category',
   DATA_URL: 'DataURL',
-  DATASHEET_URL: 'DatasheetURL',
+  ROCRATE_URL: 'ROCrateURL',
   DOCUMENTATION_URL: 'DocumentationURL',
   IS_PUBLIC: 'isPublic',
   PRODUCED_BY: 'producedBy',
   PRODUCED_BY_ORG_ID: 'producedByOrgId',
   TOPICS: 'topics',
+  TOPIC_IDS: 'topicIds',
   SUBSTRATES: 'substrates',
   SUBSTRATES_JSON: 'substrates_json',
 }
@@ -179,6 +172,7 @@ export const standardsSql = `
         , category
         , collections
         , aiAppMarkdown
+        , ${DST_TABLE_COLUMN_CONSTS.CONCERNS_DATA_TOPIC}
         , topic
         , dataTypes
         , ${DST_TABLE_COLUMN_CONSTS.RELEVANT_ORG_LINKS}
@@ -214,7 +208,7 @@ export const standardsDetailsPageSQL = `
             collections,
             AIApplicationJSON,
             aiApplicationCount,
-            topic,
+            ${DST_TABLE_COLUMN_CONSTS.CONCERNS_DATA_TOPIC},
             dataTypes,
             ${DST_TABLE_COLUMN_CONSTS.RELEVANT_ORG_NAMES},
             ${DST_TABLE_COLUMN_CONSTS.RESPONSIBLE_ORG_LINKS} as SDO,
@@ -230,6 +224,38 @@ export const standardsFtsConfig: FTSConfig = {
   textMatchesMode: 'BOOLEAN',
   distance: 50,
 }
+
+export const TOPIC_TABLE_COLUMN_CONSTS: ColumnConsts & {
+  NAME: string
+  DESCRIPTION: string
+} = {
+  ID: 'id',
+  NAME: 'name',
+  DESCRIPTION: 'description',
+  SUBCLASS_OF: 'subclassOf',
+  RELATED_TO: 'relatedTo',
+  EDAM_ID: 'edamId',
+  MESH_ID: 'meshId',
+  NCIT_ID: 'ncitId',
+  // JSON-array columns from DataTopic_denormalized. Each element has {id, name}.
+  // Counts are obtained via length of the parsed array.
+  PARENT_TOPICS_JSON: 'parentTopicsJson',
+  CHILD_TOPICS_JSON: 'childTopicsJson',
+  RELATED_TOPICS_JSON: 'relatedTopicsJson',
+  STANDARDS_JSON: 'standardsJson',
+  DATASETS_JSON: 'datasetsJson',
+  MANIFEST_DATA_PARTS_JSON: 'manifestDataPartsJson',
+} as const
+tableInfo.DataTopic_denormalized.columnConsts = TOPIC_TABLE_COLUMN_CONSTS
+
+// SELECT everything from DataTopic_denormalized — the table is small (~50 rows)
+// so the whole thing is loaded once and the hierarchy widget operates on it
+// in-memory.
+export const topicDetailsPageSQL = `SELECT ${Object.values(
+  TOPIC_TABLE_COLUMN_CONSTS,
+).join(', ')} FROM ${tableInfo.DataTopic_denormalized.id}`
+tableInfo.DataTopic_denormalized.queries ??= {}
+tableInfo.DataTopic_denormalized.queries.detailsSQL = topicDetailsPageSQL
 
 export function getTableInfo(tableName: string): TableInfo {
   const tinfo = tableInfo[tableName]
@@ -280,3 +306,5 @@ export function getIdCol(tableName: string) {
   const columnConsts = getColumnConsts(tableName)
   return columnConsts.ID
 }
+
+export const standardsSearchIndexId = 'syn74909093'

@@ -3,7 +3,6 @@ import { useGetEntity } from '@/synapse-queries'
 import { SQL_EDITOR } from '@/utils/SynapseConstants'
 import { Button, Divider, Tooltip, Typography } from '@mui/material'
 import {
-  Query,
   QueryBundleRequest,
   QueryResultBundle,
   Row,
@@ -11,11 +10,10 @@ import {
 } from '@sage-bionetworks/synapse-types'
 import { useAtomValue } from 'jotai'
 import { cloneDeep } from 'lodash-es'
-import { ReactNode, useMemo, useState } from 'react'
+import { ReactNode, useState } from 'react'
 import IconSvg from '../../IconSvg'
 import MissingQueryResultsWarning from '../../MissingQueryResultsWarning/MissingQueryResultsWarning'
 import { useQueryContext } from '../../QueryContext'
-import QueryCount from '../../QueryCount/QueryCount'
 import { useQueryVisualizationContext } from '../../QueryVisualizationWrapper'
 import {
   isRowSelectionVisibleAtom,
@@ -40,13 +38,30 @@ import { SEND_TO_ANALYSIS_PLATFORM_SIGN_IN_MESSAGE } from '../SynapseTableUtils'
 const SEND_TO_ANALYSIS_PLATFORM_BUTTON_ID =
   'SendToAnalysisPlatformTopLevelControlButton'
 
+const FILTER_TOGGLE_BUTTON_SX = {
+  ml: 2,
+  fontWeight: 400,
+  fontSize: '14px',
+  textDecoration: 'none !important',
+} as const
+
 export type TopLevelControlsProps = {
   name?: string
   hideDownload?: boolean
+  /** If true, the "Add ... files to Download List" option in the Download menu will be hidden */
+  hideAddToDownloadListMenuItem?: boolean
+  /** If true, the "Programmatic Options" option in the Download menu will be hidden */
+  hideProgrammaticOptionsMenuItem?: boolean
   hideVisualizationsControl?: boolean
   hideFacetFilterControl?: boolean
   hideQueryCount?: boolean
   hideSqlEditorControl?: boolean
+  /** When true, shows a `Show / Hide Query Builder` toggle. */
+  showQueryBuilderControl?: boolean
+  /** Current QB visibility, driven by the parent. Required when `showQueryBuilderControl` is true. */
+  showQueryBuilder?: boolean
+  /** Callback invoked when the QB toggle is clicked. Required when `showQueryBuilderControl` is true. */
+  onToggleQueryBuilder?: () => void
   customControls?: CustomControl[]
   showColumnSelection?: boolean
   cavaticaConnectAccountURL?: string
@@ -86,10 +101,15 @@ const TopLevelControls = (props: TopLevelControlsProps): React.ReactNode => {
     name,
     showColumnSelection = false,
     hideDownload = false,
+    hideAddToDownloadListMenuItem,
+    hideProgrammaticOptionsMenuItem,
     hideVisualizationsControl = false,
     hideFacetFilterControl = false,
     hideQueryCount = false,
     hideSqlEditorControl = true,
+    showQueryBuilderControl = false,
+    showQueryBuilder = false,
+    onToggleQueryBuilder,
     customControls,
     cavaticaConnectAccountURL,
     remount,
@@ -98,13 +118,11 @@ const TopLevelControls = (props: TopLevelControlsProps): React.ReactNode => {
   const {
     entityId,
     versionNumber,
-    getInitQueryRequest,
     getCurrentQueryRequest,
     hasResettableFilters,
   } = useQueryContext()
   const { data: entity } = useGetEntity<Table>(entityId, versionNumber)
   const { data: queryMetadata } = useGetQueryMetadata()
-  const { lockedColumn } = useQueryContext()
   const isRowSelectionVisible = useAtomValue(isRowSelectionVisibleAtom)
   const selectedRows = useSelectedRowsAtomValue()
   const hasSelectedRows = useHasSelectedRowsAtomValue()
@@ -130,27 +148,6 @@ const TopLevelControls = (props: TopLevelControlsProps): React.ReactNode => {
 
   const [hasRecentlyCopiedToClipboard, setHasRecentlyCopiedToClipboard] =
     useState(false)
-
-  /**
-   * We show the total number of results that would be shown if the user removed their filters.
-   * To do this, we have to create a query that captures those results.
-   */
-  const unfilteredResultsQuery: Query = useMemo(() => {
-    const initQueryRequest = getInitQueryRequest()
-    return {
-      sql: initQueryRequest.query.sql,
-      selectedFacets: (initQueryRequest.query.selectedFacets ?? []).filter(
-        facet => facet.columnName === lockedColumn?.columnName,
-      ),
-      additionalFilters: (
-        initQueryRequest.query.additionalFilters ?? []
-      ).filter(qf =>
-        'columnName' in qf
-          ? qf['columnName'] === lockedColumn?.columnName
-          : true,
-      ),
-    }
-  }, [getInitQueryRequest, lockedColumn?.columnName])
 
   /**
    * Handles the toggle of a column select, this will cause the table to
@@ -182,6 +179,11 @@ const TopLevelControls = (props: TopLevelControlsProps): React.ReactNode => {
       unitDescription,
     )
 
+  const queryCountDisplay =
+    !hideQueryCount && queryMetadata?.queryCount !== undefined
+      ? `(${queryMetadata.queryCount.toLocaleString()})`
+      : null
+
   return (
     <div className={`TopLevelControls`} data-testid="TopLevelControls">
       <div>
@@ -189,10 +191,7 @@ const TopLevelControls = (props: TopLevelControlsProps): React.ReactNode => {
           {name && (
             <>
               <Typography variant="sectionTitle" role="heading">
-                {name}{' '}
-                {!hideQueryCount && (
-                  <QueryCount query={unfilteredResultsQuery} parens={true} />
-                )}
+                {name} {queryCountDisplay}
               </Typography>
               {!hideQueryCount && entity && (
                 <MissingQueryResultsWarning entity={entity} />
@@ -209,14 +208,24 @@ const TopLevelControls = (props: TopLevelControlsProps): React.ReactNode => {
                   wrap={false}
                 />
               }
-              sx={{
-                ml: 2,
-                fontWeight: 400,
-                fontSize: '14px',
-                textDecoration: 'none !important',
-              }}
+              sx={FILTER_TOGGLE_BUTTON_SX}
             >
               {showFacetFilter ? 'Hide' : 'Show'} filters
+            </Button>
+          )}
+          {showQueryBuilderControl && onToggleQueryBuilder && (
+            <Button
+              variant={'text'}
+              onClick={onToggleQueryBuilder}
+              startIcon={
+                <IconSvg
+                  icon={showQueryBuilder ? 'close' : 'filter'}
+                  wrap={false}
+                />
+              }
+              sx={FILTER_TOGGLE_BUTTON_SX}
+            >
+              {showQueryBuilder ? 'Hide' : 'Show'} Query Builder
             </Button>
           )}
         </div>
@@ -308,6 +317,8 @@ const TopLevelControls = (props: TopLevelControlsProps): React.ReactNode => {
             <DownloadOptions
               darkTheme={true}
               onDownloadFiles={() => setShowDownloadConfirmation(true)}
+              hideAddToDownloadListMenuItem={hideAddToDownloadListMenuItem}
+              hideProgrammaticOptionsMenuItem={hideProgrammaticOptionsMenuItem}
             />
           )}
 

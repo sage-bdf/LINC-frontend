@@ -45,6 +45,11 @@ type DataGridWebSocketConstructorArgs = {
   onGridReady?: () => void
   onStatusChange?: (isOpen: boolean, instance: DataGridWebSocket) => void
   onModelCreate?: (model: GridModel) => void
+  onReplicaConnected?: () => void
+  onReplicaDisconnected?: () => void
+  onSyncStart?: () => void
+  onSyncEnd?: () => void
+  onError?: (error: unknown) => void
   maxPayloadSizeBytes?: number
   socket?: WebSocket
   model?: GridModel | null
@@ -70,6 +75,11 @@ export class DataGridWebSocket {
   private onModelCreate: (model: GridModel) => void
   private onGridReady: () => void
   private onStatusChange: (isOpen: boolean, _this: DataGridWebSocket) => void
+  private onReplicaConnected: () => void
+  private onReplicaDisconnected: () => void
+  private onSyncStart: () => void
+  private onSyncEnd: () => void
+  private onError: (error: unknown) => void
 
   constructor(args: DataGridWebSocketConstructorArgs) {
     const {
@@ -78,6 +88,11 @@ export class DataGridWebSocket {
       onGridReady,
       onStatusChange,
       onModelCreate,
+      onReplicaConnected,
+      onReplicaDisconnected,
+      onSyncStart,
+      onSyncEnd,
+      onError,
       maxPayloadSizeBytes,
       socket,
       model,
@@ -93,6 +108,11 @@ export class DataGridWebSocket {
     this.onModelCreate = onModelCreate ?? noop
     this.onGridReady = onGridReady ?? noop
     this.onStatusChange = onStatusChange ?? noop
+    this.onReplicaConnected = onReplicaConnected ?? noop
+    this.onReplicaDisconnected = onReplicaDisconnected ?? noop
+    this.onSyncStart = onSyncStart ?? noop
+    this.onSyncEnd = onSyncEnd ?? noop
+    this.onError = onError ?? noop
 
     // Restore existing model if provided
     if (model) {
@@ -232,6 +252,7 @@ export class DataGridWebSocket {
   private handleResponseComplete() {
     // Clocks are in sync, no further action needed
     this.onGridReady()
+    this.onSyncEnd()
     console.debug(
       'Clocks synchronized with server. Incrementing sequence number.',
     )
@@ -255,6 +276,7 @@ export class DataGridWebSocket {
 
       case 'error':
         console.warn('Error from server:', message.getPayload())
+        this.onError(message.getPayload())
         break
 
       case 'new-patch':
@@ -267,13 +289,18 @@ export class DataGridWebSocket {
         {
           const verbModel = this.verboseEncoder.encode(this.model)
           console.debug('New patch received, syncing data:', verbModel.time)
-          const msg = new JsonRxRequestComplete(
-            this.messageCounter.getNext(),
-            'synchronize-clock',
-            verbModel.time,
-          )
-          this.sendMessage(msg)
+          this.sendSyncMessage(verbModel.time)
         }
+        break
+
+      case 'replica-connected':
+        console.debug('A replica connected to the grid session')
+        this.onReplicaConnected()
+        break
+
+      case 'replica-disconnected':
+        console.debug('A replica disconnected from the grid session')
+        this.onReplicaDisconnected()
         break
 
       default:
@@ -332,6 +359,7 @@ export class DataGridWebSocket {
       'synchronize-clock',
       clock ?? [],
     )
+    this.onSyncStart()
     this.sendMessage(message)
   }
 

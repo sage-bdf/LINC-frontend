@@ -6,8 +6,20 @@ import type { CardConfiguration } from 'synapse-react-client/components/CardCont
 import type { ColumnIconConfigs } from 'synapse-react-client/components/CardContainerLogic/CardContainerLogic'
 import type { QueryWrapperPlotNavProps } from 'synapse-react-client/components/QueryWrapperPlotNav/QueryWrapperPlotNav'
 import * as SynapseConstants from 'synapse-react-client/utils/SynapseConstants'
-import { studiesSql } from '../resources'
+import { PortalDOIConfiguration } from 'synapse-react-client/components/GenericCard/PortalDOI/PortalDOIConfiguration'
+import {
+  doiSerializer,
+  NFResourceType,
+  RESOURCE_TYPE_KEY_CONFIGURATION,
+} from '../doiRedirector'
+import {
+  studiesSearchIndexId,
+  studiesSearchQueryConfig,
+  studiesSql,
+  SYNAPSE_PORTAL_ID,
+} from '../resources'
 import { columnAliases } from './commonProps'
+import { SearchQueryWrapperPlotNavProps } from 'synapse-react-client/components/SearchQueryWrapperPlotNav/SearchQueryWrapperPlotNav'
 
 export const newStudiesSql = `${studiesSql} order by ROW_ID desc limit 3`
 const type = SynapseConstants.GENERIC_CARD
@@ -29,7 +41,7 @@ export const studyColumnIconConfigs: ColumnIconConfigs = {
     },
     studyStatus: {
       Active: { icon: 'reload', sx: { color: '#28A745' } },
-      Completed: { icon: 'check', sx: { color: '#B2242A' } },
+      Completed: { icon: 'check', sx: { color: '#FF6B6B' } },
     },
     dataType: {
       genomicVariants: {
@@ -60,6 +72,14 @@ export const studyColumnIconConfigs: ColumnIconConfigs = {
     },
   },
 }
+export const studyDoiConfiguration: PortalDOIConfiguration = {
+  portalId: SYNAPSE_PORTAL_ID,
+  resourceType: 'STUDY',
+  resourceIdKeyColumns: RESOURCE_TYPE_KEY_CONFIGURATION['STUDY'],
+  serializeDoiString: (resourceType, attrs) =>
+    doiSerializer.serialize(resourceType as NFResourceType, attrs),
+}
+
 export const studyCardConfiguration: CardConfiguration = {
   type,
   genericCardSchema: {
@@ -84,6 +104,7 @@ export const studyCardConfiguration: CardConfiguration = {
       'previousPhaseProject',
     ],
     dataTypeIconNames: 'dataType',
+    portalDoiConfiguration: studyDoiConfiguration,
   },
   secondaryLabelLimit: 20,
   labelLinkConfig: [
@@ -122,6 +143,22 @@ export const studyCardConfiguration: CardConfiguration = {
   columnIconOptions: studyColumnIconConfigs,
 }
 
+export const toolStudyCardConfiguration: CardConfiguration = {
+  type,
+  genericCardSchema: {
+    title: 'studyName',
+    type: SynapseConstants.STUDY,
+    secondaryLabels: ['studyId'],
+  },
+  titleLinkConfig: {
+    isMarkdown: false,
+    baseURL: 'Explore/Studies',
+    URLColumnName: 'studyId',
+    urlParamStyle: 'path-segment',
+    matchColumnName: 'studyId',
+  },
+}
+
 const studies: QueryWrapperPlotNavProps = {
   rgbIndex,
   sql: studiesSql,
@@ -143,6 +180,19 @@ const studies: QueryWrapperPlotNavProps = {
       'grantDOI',
     ],
   },
+}
+
+export const studiesSearch: SearchQueryWrapperPlotNavProps = {
+  rgbIndex,
+  name: 'Studies',
+  shouldDeepLink: false,
+  cardConfiguration: studyCardConfiguration,
+  columnAliases,
+  searchIndexId: studiesSearchIndexId,
+  searchQueryConfig: studiesSearchQueryConfig,
+  autocompleteFieldName: 'studyName',
+  hideTopLevelControls: false,
+  hideQueryCount: false,
 }
 
 export default studies

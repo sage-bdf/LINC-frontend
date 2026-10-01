@@ -1,7 +1,7 @@
 import { SynapseChatProps } from 'synapse-react-client'
 
 const synapseChatConfig: SynapseChatProps = {
-  agentRegistrationId: '198',
-  chatbotName: 'Cancer Complexity Portal Assistant',
+  agentRegistrationId: '335',
+  chatbotName: 'CCKP Copilot',
 }
 export default synapseChatConfig

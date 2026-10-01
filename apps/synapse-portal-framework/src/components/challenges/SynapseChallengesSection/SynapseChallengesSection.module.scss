@@ -1,0 +1,83 @@
+@use 'synapse-react-client/style/abstracts/variables' as SrcVariables;
+@use '../ChallengeCardsSection.module.scss' as Base;
+@use 'sass:map';
+
+.SynapseChallengesSection__root {
+  margin: 120px 0;
+}
+
+.SynapseChallengesSection__sectionTitle:global(.MuiTypography-root) {
+  @include Base.sectionTitle;
+}
+
+.SynapseChallengesSection__container {
+  @include Base.sectionContainer;
+}
+
+.SynapseChallengesSection__triangleImage {
+  @include Base.imagePosition;
+  left: 83%;
+  top: 4%;
+  color: #eb8231;
+
+  @media (min-width: map.get(SrcVariables.$breakpoints, 'large')) {
+    left: 60%;
+    top: 10%;
+  }
+}
+
+.SynapseChallengesSection__circleImage {
+  @include Base.imagePosition;
+  left: 10%;
+  bottom: 100%;
+  color: #669fc1;
+
+  @media (min-width: map.get(SrcVariables.$breakpoints, 'large')) {
+    left: 35%;
+  }
+}
+
+.SynapseChallengesSection__longLineImage {
+  @include Base.imagePosition;
+  right: 10%;
+  bottom: 100%;
+  color: #6db56d;
+
+  @media (min-width: map.get(SrcVariables.$breakpoints, 'large')) {
+    right: 5%;
+    left: 58%;
+  }
+}
+
+.SynapseChallengesSection__titleSectionVectors {
+  position: absolute;
+  bottom: 16%;
+  left: 5%;
+  width: 90%;
+
+  @media (min-width: map.get(SrcVariables.$breakpoints, 'medium')) {
+    width: 100%;
+    left: -1%;
+  }
+}
+
+.SynapseChallengesSection__headerSection {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.SynapseChallengesSection__viewChallengeListButton:global(.MuiButton-root) {
+  display: flex;
+  height: 36px;
+  padding: 6px 16px;
+  margin: 36px auto 0;
+  border-radius: 8px;
+  color: var(--synapse-black) !important;
+  border: 1px solid var(--synapse-black) !important;
+  width: 400px;
+
+  @media (max-width: map.get(SrcVariables.$breakpoints, 'medium')) {
+    width: 90%;
+  }
+}

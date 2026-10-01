@@ -1,14 +1,19 @@
-import initiatives from '@/config/synapseConfigs/initiatives'
+import { portalMetadata } from '@/config/portalMetadata'
+import { initiativesSearch } from '@/config/synapseConfigs/initiatives'
 import { createStaticMeta } from '@sage-bionetworks/synapse-portal-framework/utils/detailPageRouteUtils'
-import QueryWrapperPlotNav from 'synapse-react-client/components/QueryWrapperPlotNav/QueryWrapperPlotNav'
+import SearchQueryWrapperPlotNav from 'synapse-react-client/components/SearchQueryWrapperPlotNav/SearchQueryWrapperPlotNav'
 
 export const meta = createStaticMeta(
-  'Explore Initiatives',
-  import.meta.env.VITE_PORTAL_NAME,
+  { title: 'Explore Initiatives' },
+  portalMetadata,
 )
 
 function ExploreInitiatives() {
-  return <QueryWrapperPlotNav {...initiatives} />
+  return (
+    <div className="nf-initiatives-section">
+      <SearchQueryWrapperPlotNav {...initiativesSearch} shouldDeepLink={true} />
+    </div>
+  )
 }
 
 export default ExploreInitiatives

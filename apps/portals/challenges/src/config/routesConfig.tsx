@@ -2,7 +2,7 @@ import App from '@sage-bionetworks/synapse-portal-framework/App'
 import RedirectWithQuery from '@sage-bionetworks/synapse-portal-framework/components/RedirectWithQuery'
 import sharedRoutes from '@sage-bionetworks/synapse-portal-framework/shared-config/sharedRoutes'
 import { convertModuleToRouteObject } from '@sage-bionetworks/synapse-portal-framework/utils/convertModuleToRouteObject'
-import { RouteObject } from 'react-router'
+import { Navigate, RouteObject } from 'react-router'
 import {
   COMMUNITY_PATH,
   INSTRUCTIONS_PATH,
@@ -12,12 +12,29 @@ import {
 
 const CHALLENGE_LIST_PATH = '/OpenChallenges'
 
+/**
+ * Short-name redirects: map a vanity path (e.g. "brats2026") to its full
+ * challenge details URL.  To add a new redirect, append a new entry here:
+ *
+ *   'brats2027': '/Challenges/DetailsPage?id=syn74274098',
+ */
+const CHALLENGE_SHORTCUTS: Record<string, string> = {
+  aou_challenge2026: '/Challenges/DetailsPage?id=syn73123692',
+  brats2026: '/Challenges/DetailsPage?id=syn74274097',
+  DigitalPenChallenge: '/Challenges/DetailsPage?id=syn68634259',
+  morphic_dream: '/Challenges/DetailsPage?id=syn69885382',
+}
+
 const routes: RouteObject[] = [
   {
     path: '/',
     element: <App />,
     children: [
       ...sharedRoutes,
+      ...Object.entries(CHALLENGE_SHORTCUTS).map(([shortName, target]) => ({
+        path: shortName,
+        element: <Navigate to={target} replace />,
+      })),
       {
         index: true,
         lazy: () => import('@/pages/Home').then(convertModuleToRouteObject),
@@ -48,9 +65,9 @@ const routes: RouteObject[] = [
           {
             path: INSTRUCTIONS_PATH,
             lazy: () =>
-              import(
-                '@/pages/ChallengeDetailsPageTabContent/InstructionsTab'
-              ).then(convertModuleToRouteObject),
+              import('@/pages/ChallengeDetailsPageTabContent/InstructionsTab').then(
+                convertModuleToRouteObject,
+              ),
           },
           {
             path: NEWS_PATH,
@@ -62,9 +79,9 @@ const routes: RouteObject[] = [
           {
             path: COMMUNITY_PATH,
             lazy: () =>
-              import(
-                '@/pages/ChallengeDetailsPageTabContent/CommunityTab'
-              ).then(convertModuleToRouteObject),
+              import('@/pages/ChallengeDetailsPageTabContent/CommunityTab').then(
+                convertModuleToRouteObject,
+              ),
           },
           {
             // Task tab last so we attempt to match the other paths first before using the slug

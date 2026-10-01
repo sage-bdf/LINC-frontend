@@ -1,10 +1,12 @@
 export const getSearchParam = (keyName: string): string | undefined => {
   const urlSearchParams = new URLSearchParams(window.location.search)
-  let paramValue: string | undefined = undefined
-  if (urlSearchParams && urlSearchParams.get(keyName)) {
-    paramValue = urlSearchParams.get(keyName)!
-  }
-  return paramValue
+  // A key can legitimately repeat when a link was built by appending a token to a URL that
+  // already contained one. The last non-empty value is the most recently appended, so it is the
+  // one that is still valid.
+  return urlSearchParams
+    .getAll(keyName)
+    .filter(value => value !== '')
+    .pop()
 }
 export const getStateParam = () => {
   let state = getSearchParam('state')
@@ -25,7 +27,28 @@ export const isValidUrl = (str: string) => {
   return true
 }
 
-export const hexDecodeAndDeserialize = (str: string) => {
-  const json = Buffer.from(str, 'hex').toString()
+export function serializeAndHexEncode(data: any): string {
+  const json = JSON.stringify(data)
+
+  // 1. Convert string to UTF-8 bytes
+  const bytes = new TextEncoder().encode(json)
+
+  // 2. Convert each byte to a hex string and join them
+  return Array.from(bytes)
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+export function hexDecodeAndDeserialize(str: string): any {
+  // 1. Convert Hex string to Uint8Array
+  const bytes = new Uint8Array(str.length / 2)
+  for (let i = 0; i < str.length; i += 2) {
+    bytes[i / 2] = parseInt(str.substring(i, i + 2), 16)
+  }
+
+  // 2. Decode the bytes into a UTF-8 string
+  const json = new TextDecoder().decode(bytes)
+
+  // 3. Parse as JSON
   return JSON.parse(json)
 }

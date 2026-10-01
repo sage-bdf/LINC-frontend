@@ -142,7 +142,7 @@ export function EntityTree(props: EntityTreeProps) {
     if (setDetailsViewConfiguration) {
       setDetailsViewConfiguration(DEFAULT_CONFIGURATION)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const setSelectedId = useCallback(
@@ -194,11 +194,7 @@ export function EntityTree(props: EntityTreeProps) {
   )
 
   const { data: initialContainerPath } = useGetEntityPath(initialContainer!, {
-    enabled: !!(
-      projectId &&
-      initialContainer &&
-      initialContainer.match(SYNAPSE_ENTITY_ID_REGEX)
-    ),
+    enabled: !!(projectId && initialContainer?.match(SYNAPSE_ENTITY_ID_REGEX)),
     refetchInterval: Infinity,
     throwOnError: true,
   })

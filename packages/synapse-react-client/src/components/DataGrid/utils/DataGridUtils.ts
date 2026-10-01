@@ -13,24 +13,24 @@ export const parseQueryInput = (input: string): QueryInput => {
     return { type: 'sql', input: trimmedInput }
   } else if (SYNAPSE_ENTITY_ID_REGEX.test(trimmedInput)) {
     return { type: 'recordSetId', input: trimmedInput }
-  } else if (/^[A-Za-z]\w*=+$/.test(trimmedInput)) {
+  } else if (/^[A-Za-z]\w*=*$/.test(trimmedInput)) {
     return { type: 'sessionId', input: trimmedInput }
   }
   return { type: 'unknown', input: trimmedInput }
 }
 
 export function rowsAreIdentical(a: DataGridRow, b: DataGridRow): boolean {
-  const aKeys = Object.keys(a)
-  const bKeys = Object.keys(b)
+  const isDataKey = (key: string) => !key.startsWith('__')
+  const aKeys = Object.keys(a).filter(isDataKey)
+  const bKeys = Object.keys(b).filter(isDataKey)
   if (aKeys.length !== bKeys.length) return false
   for (const key of aKeys) {
-    const aVal = a[key]
-    const bVal = b[key]
+    const aVal = a[key] as string | number | boolean | null | undefined
+    const bVal = b[key] as string | number | boolean | null | undefined
     // Treat null, undefined, and empty string as equivalent
-    const isNullish = (v: string | number | boolean | null | undefined) =>
-      v === null || v === undefined || v === ''
+    const isNullish = (v: unknown) => v === null || v === undefined || v === ''
     if (isNullish(aVal) && isNullish(bVal)) continue
-    if (String(aVal) !== String(bVal)) return false
+    if (!Object.is(aVal, bVal)) return false
   }
   return true
 }

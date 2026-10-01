@@ -1,10 +1,12 @@
 import { mockManagedACTAccessRequirement } from '@/mocks/accessRequirement/mockAccessRequirements'
+import { createMockTaskBundle } from '@/mocks/curation/mockCurationTask'
 import { mockSubmittedSubmission } from '@/mocks/dataaccess/MockSubmission'
 import {
   MOCK_USER_ID,
   MOCK_USER_ID_2,
   mockUserBundle,
 } from '@/mocks/user/mock_user_profile'
+import { useGetCurationTasksInfinite } from '@/synapse-queries/curation/task/useCurationTask'
 import { createWrapper } from '@/testutils/TestingLibraryUtils'
 import { SynapseContextType } from '@/utils/context/SynapseContext'
 import {
@@ -15,10 +17,31 @@ import { render, screen, within } from '@testing-library/react'
 import { SynapseClient } from '../../index'
 import { SynapseNavDrawer, SynapseNavDrawerProps } from './SynapseNavDrawer'
 
+vi.mock('@/synapse-queries/curation/task/useCurationTask')
+
 const defaultProps: SynapseNavDrawerProps = {
   initIsOpen: false,
   gotoPlace: vi.fn(),
 }
+
+const mockUseGetCurationTasksInfinite = vi.mocked(useGetCurationTasksInfinite)
+
+// Helper to mock curation tasks response
+const createMockCurationTasksResponse = (taskCount: number = 0) => ({
+  pages:
+    taskCount > 0
+      ? [
+          {
+            bundlePage: Array.from({ length: taskCount }, (_, i) =>
+              createMockTaskBundle({
+                taskId: i,
+                assigneePrincipalId: MOCK_USER_ID.toString(),
+              }),
+            ),
+          },
+        ]
+      : [{ bundlePage: [] }],
+})
 
 function renderComponent(wrapperProps?: Partial<SynapseContextType>) {
   render(<SynapseNavDrawer {...defaultProps} />, {
@@ -27,6 +50,17 @@ function renderComponent(wrapperProps?: Partial<SynapseContextType>) {
 }
 
 const numFilesInDownloadList = 10
+
+// Helper to set up default curation tasks mock
+const setupDefaultCurationTasksMock = (taskCount: number = 0) => {
+  mockUseGetCurationTasksInfinite.mockReturnValue({
+    data: createMockCurationTasksResponse(taskCount),
+    hasNextPage: false,
+    fetchNextPage: vi.fn(),
+    isFetchingNextPage: false,
+    isLoading: false,
+  } as any)
+}
 
 vi.spyOn(SynapseClient, 'getDownloadListStatistics').mockResolvedValue({
   concreteType:
@@ -60,6 +94,11 @@ vi.spyOn(SynapseClient, 'searchAccessSubmission').mockResolvedValue({
 const mockGetUserBundle = vi.spyOn(SynapseClient, 'getMyUserBundle')
 
 describe('SynapseNavDrawer tests', () => {
+  beforeEach(() => {
+    // Default mock: no curation tasks assigned
+    setupDefaultCurationTasksMock(0)
+  })
+
   it('Shows logged-out user items', async () => {
     renderComponent({
       isAuthenticated: false,
@@ -81,6 +120,7 @@ describe('SynapseNavDrawer tests', () => {
     expect(
       screen.queryByLabelText('Data Access Management'),
     ).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Curator Dashboard')).not.toBeInTheDocument()
 
     await within(bottomButtonGroup).findByLabelText('Sign in')
     await within(bottomButtonGroup).findByLabelText('Help')
@@ -105,15 +145,15 @@ describe('SynapseNavDrawer tests', () => {
     await within(topButtonGroup).findByLabelText('Favorites')
     await within(topButtonGroup).findByLabelText('Teams')
     await within(topButtonGroup).findByLabelText('Challenges')
-    const downloadCartButton = await within(topButtonGroup).findByLabelText(
-      'Download List',
-    )
+    const downloadCartButton =
+      await within(topButtonGroup).findByLabelText('Download List')
     await within(downloadCartButton).findByText(`${numFilesInDownloadList}`)
     await within(topButtonGroup).findByLabelText('Trash Can')
     await within(topButtonGroup).findByLabelText('Search')
     expect(
       screen.queryByLabelText('Data Access Management'),
     ).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Curator Dashboard')).not.toBeInTheDocument()
 
     await within(bottomButtonGroup).findByLabelText('Your Account')
     await within(bottomButtonGroup).findByLabelText('Help')
@@ -138,9 +178,8 @@ describe('SynapseNavDrawer tests', () => {
     await within(topButtonGroup).findByLabelText('Favorites')
     await within(topButtonGroup).findByLabelText('Teams')
     await within(topButtonGroup).findByLabelText('Challenges')
-    const downloadCartButton = await within(topButtonGroup).findByLabelText(
-      'Download List',
-    )
+    const downloadCartButton =
+      await within(topButtonGroup).findByLabelText('Download List')
     await within(downloadCartButton).findByText(`${numFilesInDownloadList}`)
     await within(topButtonGroup).findByLabelText('Trash Can')
     await within(topButtonGroup).findByLabelText('Search')
@@ -150,9 +189,39 @@ describe('SynapseNavDrawer tests', () => {
       'Data Access Management',
     )
     within(dataAccessButton).findByText(openSubmissions.length.toString())
+    expect(screen.queryByLabelText('Curator Dashboard')).not.toBeInTheDocument()
 
     await within(bottomButtonGroup).findByLabelText('Your Account')
     await within(bottomButtonGroup).findByLabelText('Help')
     expect(screen.queryByLabelText('Sign in')).not.toBeInTheDocument()
+  })
+
+  it('Shows Curator Dashboard button when user has curation tasks assigned', async () => {
+    mockGetUserBundle.mockResolvedValue({
+      ...mockUserBundle,
+      isARReviewer: false,
+    })
+
+    // Mock curation tasks assigned to the user
+    setupDefaultCurationTasksMock(2)
+
+    renderComponent()
+
+    const buttonGroups = await screen.findAllByRole('list')
+    expect(buttonGroups).toHaveLength(2)
+
+    const topButtonGroup = buttonGroups[0]
+
+    await within(topButtonGroup).findByLabelText('Projects')
+    await within(topButtonGroup).findByLabelText('Curator Dashboard')
+    await within(topButtonGroup).findByLabelText('Favorites')
+    await within(topButtonGroup).findByLabelText('Teams')
+    await within(topButtonGroup).findByLabelText('Challenges')
+    await within(topButtonGroup).findByLabelText('Download List')
+    await within(topButtonGroup).findByLabelText('Trash Can')
+    await within(topButtonGroup).findByLabelText('Search')
+    expect(
+      screen.queryByLabelText('Data Access Management'),
+    ).not.toBeInTheDocument()
   })
 })

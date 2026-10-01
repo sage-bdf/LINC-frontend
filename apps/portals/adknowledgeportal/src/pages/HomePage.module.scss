@@ -1,0 +1,57 @@
+@use 'sass:map';
+@use 'synapse-react-client/style/abstracts/variables' as SrcVariables;
+
+.resultsExplorersContainer {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-top: 40px;
+  flex-wrap: wrap;
+
+  @media (min-width: map.get(SrcVariables.$breakpoints, 'medium')) {
+    margin-top: 75px;
+    flex-wrap: nowrap;
+  }
+}
+
+.newsReleasesWordpress {
+  position: relative;
+  min-height: 500px;
+  isolation: isolate;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.helpButtonsContainer {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 40px;
+}
+
+.AdkpButtonContainer {
+  display: flex;
+  justify-content: center;
+}
+
+.newsReleasesContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 57px;
+  margin-bottom: 12px;
+
+  @media (min-width: map.get(SrcVariables.$breakpoints, 'large')) {
+    flex-direction: row;
+
+    .newsReleasesMailchimp {
+      flex: 0.7 1 0;
+    }
+
+    .newsReleasesWordpress {
+      flex: 1 1 0;
+    }
+  }
+}

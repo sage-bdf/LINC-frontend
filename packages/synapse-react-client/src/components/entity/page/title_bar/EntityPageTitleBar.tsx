@@ -8,16 +8,17 @@ import EntityActionMenu, {
   EntityActionMenuProps,
 } from '../action_menu/EntityActionMenu'
 import { EntityTitleBarVersionInfo } from './EntityTitleBarVersionInfo'
-import TitleBarProperties from './TitleBarProperties'
+import CopyToClipboardString from '@/components/CopyToClipboardString/CopyToClipboardString'
 
 export type EntityPageTitleBarProps = {
   entityId: string
   versionNumber?: number
   /* Props that will be passed through to an EntityActionMenu component */
   entityActionMenuProps?: EntityActionMenuProps
-  /* Callback invoked when an ACT member clicks "Add Conditions for Use". */
-  onActMemberClickAddConditionsForUse: () => void
 }
+
+const TITLE_BAR_BACKGROUND_COLOR = '#EAF0F5'
+const AVATAR_BACKGROUND_COLOR = '#497097'
 
 /**
  * The EntityPageTitleBar component is shown on every Entity page in Synapse, and shows an Entity's metadata and
@@ -43,13 +44,15 @@ export default function EntityPageTitleBar(props: EntityPageTitleBarProps) {
     <div>
       <Box
         sx={{
-          padding: '20px 40px',
-          backgroundColor: 'grey.100',
+          padding: '10px 16px',
+          backgroundColor: TITLE_BAR_BACKGROUND_COLOR,
+          borderRadius: '5px',
         }}
       >
         <Stack
           sx={{
-            flexDirection: { xs: 'column', sm: 'row' },
+            flexDirection: { xs: 'column', md: 'row' },
+            alignItems: 'center',
           }}
         >
           <Stack
@@ -66,7 +69,19 @@ export default function EntityPageTitleBar(props: EntityPageTitleBarProps) {
                 variant: 'circular',
               }}
             >
-              <Avatar sx={{ bgcolor: 'grey.300', height: 48, width: 48 }}>
+              <Avatar
+                sx={{
+                  bgcolor: AVATAR_BACKGROUND_COLOR,
+                  height: 68,
+                  width: 68,
+                  borderRadius: '3px',
+                  svg: {
+                    height: '36px',
+                    width: '36px',
+                  },
+                }}
+                variant={'square'}
+              >
                 {bundle?.entityType && (
                   <IconSvg
                     icon={
@@ -75,7 +90,6 @@ export default function EntityPageTitleBar(props: EntityPageTitleBarProps) {
                         : 'file'
                     }
                     wrap={false}
-                    sx={{ color: 'grey.700' }}
                   />
                 )}
               </Avatar>
@@ -89,18 +103,35 @@ export default function EntityPageTitleBar(props: EntityPageTitleBarProps) {
                 }}
               >
                 <ConditionalWrapper condition={isLoading} wrapper={Skeleton}>
-                  <Typography variant={'headline2'}>
+                  <Typography
+                    variant={'headline2'}
+                    sx={{ color: 'greyV2.950', fontWeight: 540 }}
+                  >
                     {name ?? 'Name not set'}
                   </Typography>
                 </ConditionalWrapper>
                 {bundle?.entity?.id && (
-                  <FavoriteButton entityId={bundle.entity.id} />
+                  <FavoriteButton
+                    entityId={bundle.entity.id}
+                    iconColor={'greyV2.400'}
+                  />
                 )}
               </Stack>
               <EntityTitleBarVersionInfo
                 entityId={entityId}
                 versionNumber={versionNumber}
                 toggleShowVersionHistory={toggleShowVersionHistory}
+              />
+              <CopyToClipboardString
+                value={entityId}
+                icon="rounded"
+                sx={{
+                  '& .MuiTypography-root': {
+                    color: 'greyV2.800',
+                    fontWeight: 440,
+                    lineHeight: '20px',
+                  },
+                }}
               />
             </Box>
           </Stack>
@@ -109,7 +140,6 @@ export default function EntityPageTitleBar(props: EntityPageTitleBarProps) {
           )}
         </Stack>
       </Box>
-      <TitleBarProperties {...props} />
     </div>
   )
 }

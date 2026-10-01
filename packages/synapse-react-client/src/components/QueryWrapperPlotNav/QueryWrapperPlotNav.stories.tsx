@@ -235,6 +235,35 @@ const queryWithAdditionalFilter: Query = {
   ],
 }
 
+const queryWithLockedSpecies: Query = {
+  sql: 'SELECT fileName, title, species, dataFormat, assay, tumorType, gender, tissue, grantName, grantType, consortium FROM syn9630847',
+  additionalFilters: [
+    {
+      concreteType:
+        'org.sagebionetworks.repo.model.table.ColumnSingleValueQueryFilter',
+      columnName: 'species',
+      operator: ColumnSingleValueFilterOperator.EQUAL,
+      values: ['Human'],
+    },
+  ],
+}
+
+export const FileViewWithQueryBuilder: Story = {
+  name: 'FileView with Query Builder (V1 preview)',
+  args: {
+    ...FileView.args,
+    name: 'Data (Query Builder preview)',
+    initQueryJson: JSON.stringify(queryWithLockedSpecies),
+    lockedColumn: {
+      columnName: 'species',
+      value: 'Human',
+    },
+    showQueryBuilderControl: true,
+    defaultShowQueryBuilder: true,
+    shouldDeepLink: false,
+  },
+}
+
 /**
  * This demo contains a filter on a locked column. This type of configuration should hide that the filter on the locked
  * column is applied, making it seem as if the total contents of the table are just the filtered results. Common in
@@ -274,7 +303,7 @@ const getAllIDs = async (event: CustomControlCallbackData) => {
   event.request!.query.sql = 'select id from syn51186974'
   const results = await SynapseClient.getFullQueryTableResults(event.request!)
   results.queryResult?.queryResults.rows.map(row => {
-    if (row.values && row.values[0]) ids.push(row.values[0])
+    if (row.values?.[0]) ids.push(row.values[0])
   })
   return ids
 }
@@ -363,19 +392,6 @@ export const TableWithNoDownloadAccess: Story = {
     name: 'No Table Download Access',
     hideSqlEditorControl: false,
     shouldDeepLink: false,
-    // onViewSharingSettingsClicked: undefined
-    onViewSharingSettingsClicked: (benefactorEntityId: string) => {
-      displayToast(
-        `Open the ${benefactorEntityId} Sharing Settings dialog.  If undefined, send to the entity page.`,
-        'info',
-        {
-          primaryButtonConfig: {
-            text: 'Open Entity Page',
-            href: `https://www.synapse.org/Synapse:${benefactorEntityId}`,
-          },
-        },
-      )
-    },
   },
 }
 

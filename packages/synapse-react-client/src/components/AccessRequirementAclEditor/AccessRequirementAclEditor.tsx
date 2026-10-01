@@ -9,12 +9,14 @@ import { PermissionLevel } from '@/utils/PermissionLevelToAccessType'
 import { Alert, Box, Stack, Typography } from '@mui/material'
 import { SynapseClientError } from '@sage-bionetworks/synapse-client/util/SynapseClientError'
 import { ACCESS_TYPE, AccessControlList } from '@sage-bionetworks/synapse-types'
+import { consolidateResourceAccessList } from '@/utils/functions/AccessControlListUtils'
 import { isEqual } from 'lodash-es'
 import {
   ForwardedRef,
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useState,
 } from 'react'
 import { AclEditor } from '../AclEditor/AclEditor'
@@ -70,6 +72,11 @@ export const AccessRequirementAclEditor = forwardRef(
         staleTime: Infinity,
       })
 
+    const consolidatedOriginalResourceAccess = useMemo(
+      () => consolidateResourceAccessList(originalAcl?.resourceAccess ?? []),
+      [originalAcl],
+    )
+
     const {
       resourceAccessList,
       setResourceAccessList,
@@ -86,9 +93,14 @@ export const AccessRequirementAclEditor = forwardRef(
     useEffect(() => {
       if (originalAcl) {
         resetDirtyState()
-        setResourceAccessList(originalAcl.resourceAccess)
+        setResourceAccessList(consolidatedOriginalResourceAccess)
       }
-    }, [originalAcl, setResourceAccessList])
+    }, [
+      originalAcl,
+      consolidatedOriginalResourceAccess,
+      resetDirtyState,
+      setResourceAccessList,
+    ])
 
     const { mutate: deleteAcl } = useDeleteAccessRequirementACL({
       onSuccess: () => onMutationSuccess(),
@@ -105,48 +117,44 @@ export const AccessRequirementAclEditor = forwardRef(
       onError: error => onMutationError(error),
     })
 
-    useImperativeHandle(
-      ref,
-      () => {
-        return {
-          save() {
-            const updatedAcl: AccessControlList | null =
-              resourceAccessList.length === 0
-                ? null
-                : {
-                    ...originalAcl,
-                    id: originalAcl?.id || accessRequirementId,
-                    resourceAccess: resourceAccessList,
-                  }
-            const aclIsUnchanged =
-              (originalAcl === null && updatedAcl == null) ||
-              // ignore properties that will change when the ACL is saved (etag, modifiedOn)
-              (isEqual(originalAcl?.resourceAccess, resourceAccessList) &&
-                originalAcl?.id === updatedAcl?.id)
+    useImperativeHandle(ref, () => {
+      return {
+        save() {
+          const updatedAcl: AccessControlList | null =
+            resourceAccessList.length === 0
+              ? null
+              : {
+                  ...originalAcl,
+                  id: originalAcl?.id || accessRequirementId,
+                  resourceAccess: resourceAccessList,
+                }
+          const aclIsUnchanged =
+            (originalAcl === null && updatedAcl == null) ||
+            // ignore properties that will change when the ACL is saved (etag, modifiedOn)
+            (isEqual(consolidatedOriginalResourceAccess, resourceAccessList) &&
+              originalAcl?.id === updatedAcl?.id)
 
-            if (aclIsUnchanged) {
-              // noop
-              onSaveComplete(true)
-            } else if (originalAcl === null && updatedAcl !== null) {
-              createAcl(updatedAcl)
-            } else if (updatedAcl === null) {
-              deleteAcl(accessRequirementId)
-            } else {
-              updateAcl(updatedAcl)
-            }
-          },
-        }
-      },
-      [
-        accessRequirementId,
-        originalAcl,
-        resourceAccessList,
-        createAcl,
-        deleteAcl,
-        onSaveComplete,
-        updateAcl,
-      ],
-    )
+          if (aclIsUnchanged) {
+            // noop
+            onSaveComplete(true)
+          } else if (originalAcl === null && updatedAcl !== null) {
+            createAcl(updatedAcl)
+          } else if (updatedAcl === null) {
+            deleteAcl(accessRequirementId)
+          } else {
+            updateAcl(updatedAcl)
+          }
+        },
+      }
+    }, [
+      accessRequirementId,
+      originalAcl,
+      resourceAccessList,
+      createAcl,
+      deleteAcl,
+      onSaveComplete,
+      updateAcl,
+    ])
 
     return (
       <Stack

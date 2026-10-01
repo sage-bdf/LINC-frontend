@@ -1,4 +1,3 @@
-import { ReactComponent as ArcusBioIcon } from '@/assets/ArcusBioIcon.svg'
 import { GoogleIcon24 } from '@/assets/GoogleIcon24'
 import { ReactComponent as AccessPending } from '@/assets/icons/AccessPending.svg'
 import { ReactComponent as AccessPendingCloud } from '@/assets/icons/AccessPendingCloud.svg'
@@ -7,9 +6,11 @@ import Baseline from '@/assets/icons/Baseline'
 import ClappingHands from '@/assets/icons/ClappingHands'
 import CreateVersion from '@/assets/icons/CreateVersion'
 import FileWithShield from '@/assets/icons/FileWithShield'
+import FileCopy from '@/assets/icons/FileCopy'
 import MultiFile from '@/assets/icons/MultiFile'
 import UnpackagableFile from '@/assets/icons/UnpackagableFile'
 import HandWithMoney from '@/assets/icons/HandWithMoney'
+import { NIHIcon } from '@/assets/icons/NIHIcon'
 import { ORCIDIcon } from '@/assets/icons/ORCIDIcon'
 import OpenBook from '@/assets/icons/OpenBook'
 import Podium from '@/assets/icons/Podium'
@@ -57,6 +58,7 @@ import {
   ArrowDropDownTwoTone,
   ArrowDropUpTwoTone,
   ArrowForward,
+  ArticleOutlined,
   ArticleTwoTone,
   AssessmentTwoTone,
   AssignmentOutlined,
@@ -71,8 +73,10 @@ import {
   Clear,
   CloseTwoTone,
   Code,
+  ContentCopyRounded,
   ContentCopyTwoTone,
   CreateNewFolderTwoTone,
+  DashboardOutlined,
   DashboardTwoTone,
   DeleteSweepTwoTone,
   DeleteTwoTone,
@@ -83,6 +87,7 @@ import {
   FactCheckTwoTone,
   FilterAltTwoTone,
   FlagTwoTone,
+  FolderOutlined,
   FolderTwoTone,
   FormatBold,
   FormatItalic,
@@ -101,9 +106,11 @@ import {
   LanguageTwoTone,
   LayersTwoTone,
   LinkOffTwoTone,
+  LinkOutlined,
   LinkTwoTone,
   ListTwoTone,
   LockOpenTwoTone,
+  LockTwoTone,
   Login,
   MailOutlineTwoTone,
   MoreVertTwoTone,
@@ -131,13 +138,17 @@ import {
   StrikethroughS,
   Subscript,
   Superscript,
+  Support,
   SyncTwoTone,
+  TableChartOutlined,
   TableChartTwoTone,
   TableRows,
+  TableViewOutlined,
   TableViewTwoTone,
   Title,
   UploadTwoTone,
   ViewAgendaTwoTone,
+  ViewColumnOutlined,
   ViewColumnTwoTone,
   VisibilityOffTwoTone,
   VisibilityTwoTone,
@@ -168,8 +179,10 @@ export const IconStrings = [
   'clock',
   'code',
   'columns',
+  'columnsOutlined',
   'openInNewWindow',
   'dashboard',
+  'dashboardOutlined',
   'delete',
   'deleteSweep',
   'filter',
@@ -200,6 +213,8 @@ export const IconStrings = [
   'chromatin',
   'clinical',
   'contentCopy',
+  'contentCopyRounded',
+  'fileCopy',
   'data',
   'dataLocked',
   'geneExpression',
@@ -222,15 +237,19 @@ export const IconStrings = [
   'file',
   'fileOutlined',
   'folder',
+  'folderOutlined',
   'link',
   'linkOff',
+  'linkOutlined',
   'table',
+  'tableOutlined',
   'tableRows',
   'share',
   'public',
   'people',
   'entityview',
   'submissionview',
+  'submissionviewOutlined',
   'challenge',
   'discussion',
   'dataset',
@@ -250,6 +269,7 @@ export const IconStrings = [
   'close',
   'cross',
   'verticalEllipsis',
+  'support',
   'sync',
   'clipboard',
   'clipboardCheck',
@@ -285,12 +305,13 @@ export const IconStrings = [
   'addConditions',
   'sortUp',
   'sortDown',
+  'nih',
   'orcid',
   'tasks',
   'google24',
-  'arcusbio',
   'openInFull',
   'tableview',
+  'tableviewOutlined',
   'fileWithShield',
   'baseline',
   'rosetteRibbon',
@@ -302,6 +323,10 @@ export const IconStrings = [
   'handWithMoney',
   'threeStars',
   'multiFile',
+
+  'publicVisibility',
+  'openVisibility',
+  'privateVisibility',
 ] as const
 
 export type IconName = (typeof IconStrings)[number]
@@ -364,6 +389,8 @@ function IconMapping(props: { icon: string } & SvgIconProps) {
       return <Code {...otherProps} />
     case 'columns':
       return <ViewColumnTwoTone {...otherProps} />
+    case 'columnsOutlined':
+      return <ViewColumnOutlined {...otherProps} />
     case 'circle':
       return <RadioButtonUncheckedTwoTone {...otherProps} />
     case 'checkCircle':
@@ -372,6 +399,8 @@ function IconMapping(props: { icon: string } & SvgIconProps) {
       return <CreateVersion {...otherProps} />
     case 'dashboard':
       return <DashboardTwoTone {...otherProps} />
+    case 'dashboardOutlined':
+      return <DashboardOutlined {...otherProps} />
     case 'delete':
       return <DeleteTwoTone {...otherProps} />
     case 'deleteSweep':
@@ -403,7 +432,10 @@ function IconMapping(props: { icon: string } & SvgIconProps) {
     case 'share':
       return <ShareTwoTone {...otherProps} />
     case 'public':
+    case 'openVisibility':
       return <PublicTwoTone {...otherProps} />
+    case 'privateVisibility':
+      return <LockTwoTone {...otherProps} />
     case 'clipboard':
       return <AssignmentOutlined {...otherProps} />
     case 'clipboardCheck':
@@ -457,6 +489,10 @@ function IconMapping(props: { icon: string } & SvgIconProps) {
       return <Clinical {...otherProps} />
     case 'contentCopy':
       return <ContentCopyTwoTone {...otherProps} />
+    case 'contentCopyRounded':
+      return <ContentCopyRounded {...otherProps} />
+    case 'fileCopy':
+      return <FileCopy {...otherProps} />
     case 'data':
       return <Data {...otherProps} />
     case 'dataLocked':
@@ -492,6 +528,7 @@ function IconMapping(props: { icon: string } & SvgIconProps) {
     case 'other':
       return <Other fill={color} {...otherProps} />
     case 'wiki':
+    case 'publicVisibility':
       return <LanguageTwoTone {...otherProps} />
     case 'file':
       return <InsertDriveFileTwoTone {...otherProps} />
@@ -499,20 +536,30 @@ function IconMapping(props: { icon: string } & SvgIconProps) {
       return <InsertDriveFileOutlined {...otherProps} />
     case 'folder':
       return <FolderTwoTone {...otherProps} />
+    case 'folderOutlined':
+      return <FolderOutlined {...otherProps} />
     case 'newFolder':
       return <CreateNewFolderTwoTone {...otherProps} />
     case 'link':
       return <LinkTwoTone {...otherProps} />
     case 'linkOff':
       return <LinkOffTwoTone {...otherProps} />
+    case 'linkOutlined':
+      return <LinkOutlined {...otherProps} />
     case 'table':
       return <TableChartTwoTone {...otherProps} />
+    case 'tableOutlined':
+      return <TableChartOutlined {...otherProps} />
     case 'tableview':
       return <TableViewTwoTone {...otherProps} />
+    case 'tableViewOutlined':
+      return <TableViewOutlined {...otherProps} />
     case 'entityview':
       return <ListTwoTone {...otherProps} />
     case 'submissionview':
       return <ArticleTwoTone {...otherProps} />
+    case 'submissionviewOutlined':
+      return <ArticleOutlined {...otherProps} />
     case 'challenge':
       return <AssessmentTwoTone {...otherProps} />
     case 'discussion':
@@ -571,6 +618,8 @@ function IconMapping(props: { icon: string } & SvgIconProps) {
       return <Image {...otherProps} />
     case 'superscript':
       return <Superscript {...otherProps} />
+    case 'support':
+      return <Support {...otherProps} />
     case 'subscript':
       return <Subscript {...otherProps} />
     case 'edit':
@@ -601,8 +650,8 @@ function IconMapping(props: { icon: string } & SvgIconProps) {
       return <Sort {...otherProps} />
     case 'google24':
       return <GoogleIcon24 {...otherProps} />
-    case 'arcusbio':
-      return <ArcusBioIcon {...otherProps} />
+    case 'nih':
+      return <NIHIcon {...otherProps} />
     case 'orcid':
       return <ORCIDIcon {...otherProps} />
     case 'tasks':
@@ -701,6 +750,24 @@ export const type2SvgIconName: Record<EntityType, IconName> = {
   dataset: 'dataset',
   datasetcollection: 'datasetcollection',
   recordset: 'fileWithShield',
+  searchindex: 'search',
+}
+
+export const type2SvgIconNameOutlined: Record<EntityType, IconName> = {
+  file: 'fileOutlined',
+  project: 'dashboardOutlined',
+  folder: 'folderOutlined',
+  table: 'tableOutlined',
+  link: 'linkOutlined',
+  entityview: 'actionKey',
+  materializedview: 'tableviewOutlined',
+  virtualtable: 'columnsOutlined',
+  dockerrepo: 'docker',
+  submissionview: 'submissionviewOutlined',
+  dataset: 'dataset',
+  datasetcollection: 'datasetcollection',
+  recordset: 'fileWithShield',
+  searchindex: 'searchOutlined',
 }
 
 export default IconSvg

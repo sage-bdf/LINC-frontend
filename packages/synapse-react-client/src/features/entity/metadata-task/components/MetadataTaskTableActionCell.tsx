@@ -1,12 +1,12 @@
-import { getLinkToGridSession } from '@/utils/functions/getSynapseWebClientLink'
 import { StickyNote2Outlined } from '@mui/icons-material'
-import { Button, Tooltip } from '@mui/material'
-import { CurationTask } from '@sage-bionetworks/synapse-client'
-import { useCallback } from 'react'
-import useGridSessionForCurationTask from '../hooks/useGridSessionForCurationTask'
-import { getGridSourceIdForTask } from '../utils/getGridSourceIdForTask'
-import { useGetEntityPermissions } from '@/synapse-queries/entity/useEntity'
-import { displayToast } from '@/components/ToastMessage/ToastMessage'
+import { Box, Button, Tooltip } from '@mui/material'
+import { TaskBundle } from '@sage-bionetworks/synapse-client'
+import { useNavigate } from 'react-router'
+import useOpenCuratorFromTaskButton from '../hooks/useOpenCuratorButton'
+import {
+  OPEN_CURATOR_NO_PERMISSION_ON_SOURCE_ERROR_MESSAGE,
+  OPEN_CURATOR_TOOLTIP_TITLE,
+} from '../utils/constants'
 
 /**
  * Handles rendering the 'Actions' cell in the Metadata Task table, which provides buttons for the user
@@ -14,77 +14,48 @@ import { displayToast } from '@/components/ToastMessage/ToastMessage'
  * by the task.
  */
 export default function MetadataTaskTableActionCell(props: {
-  curationTask: CurationTask
+  taskBundle: TaskBundle
   canEdit: boolean
 }) {
-  const {
-    curationTask,
-    // canEdit
-  } = props
+  const { canEdit, taskBundle } = props
+  const navigate = useNavigate()
 
-  const { mutateAsync: getGridSessionForTask, isPending: openGridIsPending } =
-    useGridSessionForCurationTask()
+  const { hasPermission, isLoading, isPending, onClick } =
+    useOpenCuratorFromTaskButton(taskBundle)
 
-  const gridSourceId = getGridSourceIdForTask(curationTask)
-  const { data, isLoading } = useGetEntityPermissions(gridSourceId)
-  const isOpenDataGridDisabled =
-    openGridIsPending || isLoading || !data?.canView
-  const toolTipTitle = data?.canView
-    ? 'Open Curator to edit metadata'
-    : 'You must have READ access to ' +
-      gridSourceId +
-      ' to view the Working Copy'
-
-  const handleOpenDataGrid = useCallback(async () => {
-    try {
-      const gridSession = await getGridSessionForTask({ curationTask })
-      const gridUrl = getLinkToGridSession(
-        gridSession.sessionId!,
-        curationTask.taskId,
-      )
-
-      // Open the Grid in a new tab
-      window.open(gridUrl, '_blank', 'noopener')
-    } catch (error) {
-      console.error('Error opening Curator for curation task', error)
-      displayToast(error.message, 'danger', {
-        title: 'An error occurred while trying to open Curator',
-      })
-    }
-  }, [curationTask, getGridSessionForTask])
-
-  // TODO: SWC-7480
-  // const editTaskButton = canEdit ? <></> : null
-
-  // TODO: SWC-7484
-  // const isFileBasedTask = instanceOfFileBasedMetadataTaskProperties(
-  //   curationTask.taskProperties!,
-  // )
-  // const uploadButton = isFileBasedTask ? <></> : null
-
-  const openDataGridButton = (
-    <Tooltip title={toolTipTitle}>
-      <span>
-        <Button
-          size={'small'}
-          startIcon={<StickyNote2Outlined />}
-          loading={openGridIsPending || isLoading}
-          disabled={isOpenDataGridDisabled}
-          onClick={() => {
-            void handleOpenDataGrid()
-          }}
-        >
-          Open Curator
-        </Button>
-      </span>
-    </Tooltip>
-  )
+  const disableButton = isPending || isLoading || !hasPermission
+  let tooltipTitle: string | undefined = undefined
+  if (hasPermission === true) {
+    tooltipTitle = OPEN_CURATOR_TOOLTIP_TITLE
+  } else if (hasPermission === false) {
+    tooltipTitle = OPEN_CURATOR_NO_PERMISSION_ON_SOURCE_ERROR_MESSAGE
+  }
 
   return (
-    <>
-      {/*{editTaskButton}*/}
-      {openDataGridButton}
-      {/*{uploadButton}*/}
-    </>
+    <Box sx={{ display: 'flex', flexDirection: 'row', gap: 1 }}>
+      {canEdit && (
+        <Button
+          variant="outlined"
+          onClick={() => void navigate(`edit/${taskBundle.task!.taskId}`)}
+          size={'small'}
+        >
+          Edit
+        </Button>
+      )}
+      <Tooltip title={tooltipTitle}>
+        <span>
+          <Button
+            variant="contained"
+            size={'small'}
+            startIcon={<StickyNote2Outlined />}
+            loading={isPending}
+            disabled={disableButton}
+            onClick={onClick}
+          >
+            Open Curator
+          </Button>
+        </span>
+      </Tooltip>
+    </Box>
   )
 }

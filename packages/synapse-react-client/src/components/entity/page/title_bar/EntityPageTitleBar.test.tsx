@@ -9,6 +9,7 @@ import {
 import { EntityType } from '@sage-bionetworks/synapse-client'
 import { DockerRepository, EntityBundle } from '@sage-bionetworks/synapse-types'
 import { render, screen } from '@testing-library/react'
+import * as CopyToClipboardStringModule from '../../../CopyToClipboardString/CopyToClipboardString'
 import * as FavoriteButtonModule from '../../../favorites/FavoriteButton'
 import * as EntityActionMenuModule from '../action_menu/EntityActionMenu'
 import { EntityActionMenuProps } from '../action_menu/EntityActionMenu'
@@ -16,16 +17,11 @@ import EntityPageTitleBar, {
   EntityPageTitleBarProps,
 } from './EntityPageTitleBar'
 import * as TitleBarVersionInfoModule from './EntityTitleBarVersionInfo'
-import * as TitleBarPropertiesModule from './TitleBarProperties'
 
-const TITLE_BAR_PROPERTIES_TEST_ID = 'title-bar-properties'
 const TITLE_BAR_VERSION_INFO_TEST_ID = 'title-bar-version-info'
+const TITLE_BAR_SYN_ID_TEST_ID = 'title-bar-syn-id'
 const ENTITY_ACTION_MENU_TEST_ID = 'entity-action-menu'
 const FAVORITE_BUTTON_TEST_ID = 'favorite-button'
-
-vi.spyOn(TitleBarPropertiesModule, 'default').mockImplementation(() => (
-  <div data-testid={TITLE_BAR_PROPERTIES_TEST_ID}></div>
-))
 
 vi.spyOn(
   TitleBarVersionInfoModule,
@@ -40,6 +36,10 @@ vi.spyOn(EntityActionMenuModule, 'default').mockImplementation(() => (
 
 vi.spyOn(FavoriteButtonModule, 'default').mockImplementation(() => (
   <span data-testid={FAVORITE_BUTTON_TEST_ID}></span>
+))
+
+vi.spyOn(CopyToClipboardStringModule, 'default').mockImplementation(() => (
+  <div data-testid={TITLE_BAR_SYN_ID_TEST_ID}></div>
 ))
 
 function renderComponent(props: EntityPageTitleBarProps) {
@@ -57,7 +57,6 @@ function useEntityBundleOverride(bundle: EntityBundle) {
   )
 }
 
-const onActMemberClickAddConditionsForUse = vi.fn()
 const toggleShowVersionHistory = vi.fn()
 
 const actionMenuProps: EntityActionMenuProps = {
@@ -86,7 +85,6 @@ const defaultProps: EntityPageTitleBarProps = {
   entityId: mockFileEntity.id,
   versionNumber: mockFileEntity.entity.versionNumber,
   entityActionMenuProps: actionMenuProps,
-  onActMemberClickAddConditionsForUse,
 }
 
 describe('Entity Page Title Bar', () => {
@@ -120,6 +118,7 @@ describe('Entity Page Title Bar', () => {
     await screen.findByTestId(FAVORITE_BUTTON_TEST_ID)
     expect(FavoriteButtonModule.default).toHaveBeenRenderedWithProps({
       entityId: defaultProps.entityId,
+      iconColor: 'greyV2.400',
     })
   })
   it('Shows version info component', async () => {
@@ -144,16 +143,14 @@ describe('Entity Page Title Bar', () => {
       defaultProps.entityActionMenuProps,
     )
   })
-  it('Shows the properties', async () => {
-    // Component is mocked and interactions are tested separately
+
+  it('Shows the SynID copy component', async () => {
     renderComponent(defaultProps)
-    await screen.findByTestId(TITLE_BAR_PROPERTIES_TEST_ID)
-    expect(TitleBarPropertiesModule.default).toHaveBeenRenderedWithProps(
+    await screen.findByTestId(TITLE_BAR_SYN_ID_TEST_ID)
+    expect(CopyToClipboardStringModule.default).toHaveBeenRenderedWithProps(
       expect.objectContaining({
-        entityId: defaultProps.entityId,
-        versionNumber: defaultProps.versionNumber,
-        onActMemberClickAddConditionsForUse:
-          defaultProps.onActMemberClickAddConditionsForUse,
+        value: defaultProps.entityId,
+        icon: 'rounded',
       }),
     )
   })

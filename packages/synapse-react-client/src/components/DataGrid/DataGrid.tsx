@@ -23,6 +23,7 @@ import {
   calculateDefaultColumnWidth,
   HeaderOptions,
 } from './utils/calculateColumnWidth'
+import type { RemoteSelection } from './hooks/useRemoteSelections'
 
 type DataGridProps = {
   gridRef: React.RefObject<DataSheetGridRef | null>
@@ -35,10 +36,8 @@ type DataGridProps = {
   lastSelection: SelectionWithId | null
   handleChange: (newValue: DataGridRow[], operations: Operation[]) => void
   handleSelectionChange: (opts: { selection: SelectionWithId | null }) => void
-  onSelectedRowChange?: (
-    rowIndex: number | null,
-    row: DataGridRow | null,
-  ) => void
+  remoteSelections?: readonly RemoteSelection[]
+  upsertKey?: string[]
 }
 
 /**
@@ -58,7 +57,8 @@ export default function DataGrid(props: DataGridProps) {
     lastSelection,
     handleChange,
     handleSelectionChange,
-    onSelectedRowChange,
+    remoteSelections,
+    upsertKey,
   } = props
 
   // Move columnWidths state into DataGrid
@@ -138,6 +138,7 @@ export default function DataGrid(props: DataGridProps) {
         columnWidths,
         pinnedColumnsSet,
         handleTogglePin,
+        upsertKey,
       ),
     [
       columnNames,
@@ -146,6 +147,7 @@ export default function DataGrid(props: DataGridProps) {
       columnWidths,
       pinnedColumnsSet,
       handleTogglePin,
+      upsertKey,
     ],
   )
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null)
@@ -192,9 +194,10 @@ export default function DataGrid(props: DataGridProps) {
         selectedRowIndex,
         lastSelection,
         colValues,
+        remoteSelections,
       })
     },
-    [selectedRowIndex, lastSelection, colValues],
+    [selectedRowIndex, lastSelection, colValues, remoteSelections],
   )
 
   // Wrap duplicateRow in useCallback
@@ -208,15 +211,9 @@ export default function DataGrid(props: DataGridProps) {
   // Wrap onActiveCellChange in useCallback
   const handleActiveCellChange = useCallback(
     ({ cell }: { cell: { row: number; col: number } | null }) => {
-      if (cell) {
-        setSelectedRowIndex(cell.row)
-        onSelectedRowChange?.(cell.row, rowValues[cell.row])
-      } else {
-        setSelectedRowIndex(null)
-        onSelectedRowChange?.(null, null)
-      }
+      setSelectedRowIndex(cell ? cell.row : null)
     },
-    [onSelectedRowChange, rowValues],
+    [],
   )
 
   // Wrapper ref for the grid container
@@ -265,7 +262,7 @@ export default function DataGrid(props: DataGridProps) {
         ref={gridRef}
         value={rowValues}
         columns={colValues}
-        autoAddRow={!entityIsView}
+        autoAddRow={false}
         disableSmartDelete
         addRowsComponent={addRowsComponent}
         contextMenuComponent={contextMenuComponent}
